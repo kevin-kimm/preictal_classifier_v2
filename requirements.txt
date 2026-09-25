@@ -1,0 +1,12 @@
+numpy
+scipy
+pandas
+mne
+pyyaml
+scikit-learn
+matplotlib
+pytest
+
+# Added when those modules are written:
+# torch        model training (Apple Silicon GPU via MPS)
+# brainflow    OpenBCI Cyton acquisition (Deliverable 3)

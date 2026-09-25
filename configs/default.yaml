@@ -1,0 +1,32 @@
+# Single source of truth for pipeline parameters.
+# Entries marked (VTP) are fixed by docs/verification_plan.md.
+# Change the plan first, then change them here.
+
+signal:
+  target_fs_hz: 256                  # CHB-MIT native rate; Siena decimates by 2
+  montage: bipolar_longitudinal      # (VTP) decision D-4
+  units: uV
+
+labels:
+  preictal_start_min_before_onset: 30   # (VTP)
+  preictal_end_s_before_onset: 30       # (VTP) seizure prediction horizon, decision D-1
+  interictal_min_gap_h: 4               # (VTP)
+  cluster_merge_min: 30                 # (VTP) seizures closer than this are one event
+  min_preictal_coverage: 0.9            # (VTP) fraction of the preictal period that must be recorded
+
+windows:
+  length_s: null        # set during Deliverable 1 development, before testing
+  step_s: null
+
+alarm:
+  refractory_min: 30    # (VTP) no new alarm for 30 min after an alarm
+  smoothing_windows: null
+  persistence_windows: null
+
+evaluation:
+  seeds: [0, 1, 2, 3, 4]              # (VTP) pre-registered; all are reported
+  inner_validation_fraction: 0.2      # (VTP) training patients held out for thresholds
+  bootstrap_resamples: 1000
+  far_target_per_24h:
+    d1: 10              # (VTP) proposed
+    d2: 5               # (VTP) course plan, decision D-3
