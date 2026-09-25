@@ -1,5 +1,7 @@
 # Verification Test Plan: preictal_classifier_v2
 
+Version 1.0, frozen 2026-09-25. Author: Kevin Kim.
+
 ## 1. Purpose
 
 This plan lists every test for Deliverables 1–3, how each one is run, and what counts as a pass or fail. I'm writing it before any testing and freezing it in Git as v1.0, so the commit history shows the criteria came first.
@@ -391,6 +393,7 @@ A deviation is any change to a requirement, method or pass criterion after v1.0.
 |---|---|---|
 | 0.1 | 2026-09-25 | First draft from the course plan |
 | 0.2 | 2026-09-25 | Settled D-1 to D-5 (preictal ends 5 s before onset, common montage, TUSZ interictal rule); added D-6; rewrote for clarity |
+| 1.0 | 2026-09-25 | Frozen before any testing |
 
 ## 10. References
 
