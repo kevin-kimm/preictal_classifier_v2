@@ -26,7 +26,8 @@
     registration end (18.57.13) and 61 min after onset (18.28.29). Assumed to be an hour
     typo for 18.29.29, the smallest edit that fits; that makes the seizure 60 s long,
     in line with PN00's other seizures. 18:29:29 is 825 s after the recording start
-    (18:15:44). To be confirmed by eye in results/d1/figures/flagged_*.
+    (18:15:44). Confirmed by eye on 2026-09-25: the rhythmic right temporal discharge
+    stops at 825 s (results/d1/figures/flagged_01_siena_PN00-3_used.png).
 
 - dataset: tusz
   recording: aaaaapks_s016_t000.edf
