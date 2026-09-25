@@ -41,6 +41,21 @@ def test_siena_blocks(tmp_path):
     assert blocks[1]["end"] == 7 * 3600 + 14 * 60
 
 
+def test_siena_blocks_file_name_before_heading(tmp_path):
+    f = tmp_path / "Seizures-list-PN11.txt"
+    f.write_text("Seizures list of patient PN11\nFile name: PN11-1.edf\n\nSeizure n 1:\n"
+                 "Seizure start time: 13.37.19\nSeizure end time: 13.38.00\n\n"
+                 "File name: PN11-2.edf\nSeizure n 2:\nStart time: 14.00.00\nEnd time: 14.01.00\n")
+    blocks = siena_blocks(f)
+    assert [b["file"] for b in blocks] == ["PN11-1.edf", "PN11-2.edf"]
+
+
+def test_siena_blocks_without_file_name(tmp_path):
+    f = tmp_path / "Seizures-list-PN99.txt"
+    f.write_text("Seizure n 1:\nSeizure start time: 13.37.19\nSeizure end time: 13.38.00\n")
+    assert siena_blocks(f)[0].get("file") is None
+
+
 def test_match_siena_file(tmp_path):
     names = ["PN06-1.edf", "PN06-2.edf"]
     by_name = {n.lower(): tmp_path / n for n in names}

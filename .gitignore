@@ -218,7 +218,7 @@ __marimo__/
 .streamlit/secrets.toml
 
 # Datasets: excluded for data use agreements and size
-data/
+/data/
 *.edf
 .DS_Store
 results/d1/quick/
