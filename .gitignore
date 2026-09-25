@@ -221,3 +221,4 @@ __marimo__/
 data/
 *.edf
 .DS_Store
+results/d1/quick/
