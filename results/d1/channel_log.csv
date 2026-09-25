@@ -1,0 +1,562 @@
+dataset,raw_label,kind,canonical,status,n_recordings
+chbmit,-,placeholder,,excluded: empty placeholder channel,292
+chbmit,.,placeholder,,excluded: empty placeholder channel,64
+chbmit,01,electrode,O1,used,2
+chbmit,C2,electrode,C2,"recognized, not needed for the montage",2
+chbmit,C2-CS2,electrode,C2 (ref CS2),"recognized, not needed for the montage",1
+chbmit,C3,electrode,C3,used,2
+chbmit,C3-CS2,electrode,C3 (ref CS2),used,1
+chbmit,C3-P3,bipolar,C3-P3,used,683
+chbmit,C4,electrode,C4,used,2
+chbmit,C4-CS2,electrode,C4 (ref CS2),used,1
+chbmit,C4-P4,bipolar,C4-P4,used,683
+chbmit,C6,electrode,C6,"recognized, not needed for the montage",2
+chbmit,C6-CS2,electrode,C6 (ref CS2),"recognized, not needed for the montage",1
+chbmit,CP1-Ref,electrode,CP1 (ref REF),"recognized, not needed for the montage",40
+chbmit,CP2,electrode,CP2,"recognized, not needed for the montage",2
+chbmit,CP2-CS2,electrode,CP2 (ref CS2),"recognized, not needed for the montage",1
+chbmit,CP2-Ref,electrode,CP2 (ref REF),"recognized, not needed for the montage",40
+chbmit,CP4,electrode,CP4,"recognized, not needed for the montage",2
+chbmit,CP4-CS2,electrode,CP4 (ref CS2),"recognized, not needed for the montage",1
+chbmit,CP5-Ref,electrode,CP5 (ref REF),"recognized, not needed for the montage",40
+chbmit,CP6,electrode,CP6,"recognized, not needed for the montage",2
+chbmit,CP6-CS2,electrode,CP6 (ref CS2),"recognized, not needed for the montage",1
+chbmit,CP6-Ref,electrode,CP6 (ref REF),"recognized, not needed for the montage",40
+chbmit,CZ,electrode,Cz,used,2
+chbmit,CZ-CS2,electrode,Cz (ref CS2),used,1
+chbmit,CZ-PZ,bipolar,Cz-Pz,used,683
+chbmit,ECG,non_eeg,,excluded: non-EEG signal,36
+chbmit,EKG1-CHIN,non_eeg,,excluded: non-EEG signal,2
+chbmit,EKG1-EKG2,non_eeg,,excluded: non-EEG signal,1
+chbmit,F3,electrode,F3,used,2
+chbmit,F3-C3,bipolar,F3-C3,used,683
+chbmit,F3-CS2,electrode,F3 (ref CS2),used,1
+chbmit,F4,electrode,F4,used,2
+chbmit,F4-C4,bipolar,F4-C4,used,683
+chbmit,F4-CS2,electrode,F4 (ref CS2),used,1
+chbmit,F7,electrode,F7,used,2
+chbmit,F7-CS2,electrode,F7 (ref CS2),used,1
+chbmit,F7-T7,bipolar,F7-T7,used,683
+chbmit,F8,electrode,F8,used,2
+chbmit,F8-CS2,electrode,F8 (ref CS2),used,1
+chbmit,F8-T8,bipolar,F8-T8,used,683
+chbmit,FC1-Ref,electrode,FC1 (ref REF),"recognized, not needed for the montage",40
+chbmit,FC2-Ref,electrode,FC2 (ref REF),"recognized, not needed for the montage",40
+chbmit,FC5-Ref,electrode,FC5 (ref REF),"recognized, not needed for the montage",40
+chbmit,FC6-Ref,electrode,FC6 (ref REF),"recognized, not needed for the montage",40
+chbmit,FP1,electrode,Fp1,used,2
+chbmit,FP1-CS2,electrode,Fp1 (ref CS2),used,1
+chbmit,FP1-F3,bipolar,Fp1-F3,used,683
+chbmit,FP1-F7,bipolar,Fp1-F7,used,683
+chbmit,FP2,electrode,Fp2,used,2
+chbmit,FP2-CS2,electrode,Fp2 (ref CS2),used,1
+chbmit,FP2-F4,bipolar,Fp2-F4,used,683
+chbmit,FP2-F8,bipolar,Fp2-F8,used,683
+chbmit,FT10-T8,bipolar,FT10-T8,"recognized, not needed for the montage",655
+chbmit,FT9-FT10,bipolar,FT9-FT10,"recognized, not needed for the montage",655
+chbmit,FZ,electrode,Fz,used,2
+chbmit,FZ-CS2,electrode,Fz (ref CS2),used,1
+chbmit,FZ-CZ,bipolar,Fz-Cz,used,683
+chbmit,LOC-ROC,non_eeg,,excluded: non-EEG signal,11
+chbmit,LUE-RAE,non_eeg,,excluded: non-EEG signal,1
+chbmit,O1-CS2,electrode,O1 (ref CS2),used,1
+chbmit,O2,electrode,O2,used,2
+chbmit,O2-CS2,electrode,O2 (ref CS2),used,1
+chbmit,P3,electrode,P3,used,2
+chbmit,P3-CS2,electrode,P3 (ref CS2),used,1
+chbmit,P3-O1,bipolar,P3-O1,used,683
+chbmit,P4,electrode,P4,used,2
+chbmit,P4-CS2,electrode,P4 (ref CS2),used,1
+chbmit,P4-O2,bipolar,P4-O2,used,683
+chbmit,P7,electrode,P7,used,2
+chbmit,P7-CS2,electrode,P7 (ref CS2),used,1
+chbmit,P7-O1,bipolar,P7-O1,used,683
+chbmit,P7-T7,bipolar,P7-T7,"recognized, not needed for the montage",655
+chbmit,P8,electrode,P8,used,2
+chbmit,P8-CS2,electrode,P8 (ref CS2),used,1
+chbmit,P8-O2,bipolar,P8-O2,used,683
+chbmit,PZ,electrode,Pz,used,2
+chbmit,PZ-CS2,electrode,Pz (ref CS2),used,1
+chbmit,PZ-OZ,bipolar,Pz-Oz,"recognized, not needed for the montage",39
+chbmit,T7,electrode,T7,used,2
+chbmit,T7-CS2,electrode,T7 (ref CS2),used,1
+chbmit,T7-FT9,bipolar,T7-FT9,"recognized, not needed for the montage",655
+chbmit,T7-P7,bipolar,T7-P7,used,683
+chbmit,T8,electrode,T8,used,2
+chbmit,T8-CS2,electrode,T8 (ref CS2),used,1
+chbmit,T8-P8,bipolar,T8-P8,excluded: duplicate of an earlier channel,655
+chbmit,T8-P8,bipolar,T8-P8,used,683
+chbmit,VNS,non_eeg,,excluded: non-EEG signal,18
+mental_arith,ECG ECG,non_eeg,,excluded: non-EEG signal,72
+mental_arith,EDF Annotations,unrecognized,,unrecognized label,72
+mental_arith,EEG A2-A1,bipolar,A2-A1,"recognized, not needed for the montage",72
+mental_arith,EEG C3,electrode,C3,used,72
+mental_arith,EEG C4,electrode,C4,used,72
+mental_arith,EEG Cz,electrode,Cz,used,72
+mental_arith,EEG F3,electrode,F3,used,72
+mental_arith,EEG F4,electrode,F4,used,72
+mental_arith,EEG F7,electrode,F7,used,72
+mental_arith,EEG F8,electrode,F8,used,72
+mental_arith,EEG Fp1,electrode,Fp1,used,72
+mental_arith,EEG Fp2,electrode,Fp2,used,72
+mental_arith,EEG Fz,electrode,Fz,used,72
+mental_arith,EEG O1,electrode,O1,used,72
+mental_arith,EEG O2,electrode,O2,used,72
+mental_arith,EEG P3,electrode,P3,used,72
+mental_arith,EEG P4,electrode,P4,used,72
+mental_arith,EEG Pz,electrode,Pz,used,72
+mental_arith,EEG T3,electrode,T7,used,72
+mental_arith,EEG T4,electrode,T8,used,72
+mental_arith,EEG T5,electrode,P7,used,72
+mental_arith,EEG T6,electrode,P8,used,72
+siena,1,numbered,,excluded: numbered channel with no electrode position,41
+siena,2,numbered,,excluded: numbered channel with no electrode position,41
+siena,23,numbered,,excluded: numbered channel with no electrode position,8
+siena,3,numbered,,excluded: numbered channel with no electrode position,8
+siena,31,numbered,,excluded: numbered channel with no electrode position,8
+siena,33,numbered,,excluded: numbered channel with no electrode position,8
+siena,61,numbered,,excluded: numbered channel with no electrode position,25
+siena,62,numbered,,excluded: numbered channel with no electrode position,25
+siena,63,numbered,,excluded: numbered channel with no electrode position,25
+siena,64,numbered,,excluded: numbered channel with no electrode position,25
+siena,A,unrecognized,,unrecognized label,8
+siena,B,unrecognized,,unrecognized label,25
+siena,C,unrecognized,,unrecognized label,25
+siena,D,unrecognized,,unrecognized label,25
+siena,EEG C3,electrode,C3,used,41
+siena,EEG C4,electrode,C4,used,41
+siena,EEG CZ,electrode,Cz,used,8
+siena,EEG Cp1,electrode,CP1,"recognized, not needed for the montage",41
+siena,EEG Cp2,electrode,CP2,"recognized, not needed for the montage",41
+siena,EEG Cp5,electrode,CP5,"recognized, not needed for the montage",41
+siena,EEG Cp6,electrode,CP6,"recognized, not needed for the montage",41
+siena,EEG Cz,electrode,Cz,used,33
+siena,EEG F10,electrode,F10,"recognized, not needed for the montage",41
+siena,EEG F3,electrode,F3,used,41
+siena,EEG F4,electrode,F4,used,41
+siena,EEG F7,electrode,F7,used,41
+siena,EEG F8,electrode,F8,used,41
+siena,EEG F9,electrode,F9,"recognized, not needed for the montage",41
+siena,EEG FP2,electrode,Fp2,used,35
+siena,EEG Fc1,electrode,FC1,"recognized, not needed for the montage",41
+siena,EEG Fc2,electrode,FC2,"recognized, not needed for the montage",41
+siena,EEG Fc5,electrode,FC5,"recognized, not needed for the montage",41
+siena,EEG Fc6,electrode,FC6,"recognized, not needed for the montage",41
+siena,EEG Fp1,electrode,Fp1,used,41
+siena,EEG Fp2,electrode,Fp2,used,6
+siena,EEG Fz,electrode,Fz,used,41
+siena,EEG O1,electrode,O1,used,41
+siena,EEG O2,electrode,O2,used,41
+siena,EEG P10,electrode,P10,"recognized, not needed for the montage",33
+siena,EEG P3,electrode,P3,used,41
+siena,EEG P4,electrode,P4,used,41
+siena,EEG P9,electrode,P9,"recognized, not needed for the montage",33
+siena,EEG Pz,electrode,Pz,used,41
+siena,EEG T3,electrode,T7,used,41
+siena,EEG T4,electrode,T8,used,41
+siena,EEG T5,electrode,P7,used,41
+siena,EEG T6,electrode,P8,used,41
+siena,EKG EKG,non_eeg,,excluded: non-EEG signal,33
+siena,HR,non_eeg,,excluded: non-EEG signal,41
+siena,MK,non_eeg,,excluded: non-EEG signal,41
+siena,PLET,non_eeg,,excluded: non-EEG signal,25
+siena,SPO2,non_eeg,,excluded: non-EEG signal,41
+tuar,BURSTS,non_eeg,,excluded: non-EEG signal,288
+tuar,DC1-DC,non_eeg,,excluded: non-EEG signal,12
+tuar,DC2-DC,non_eeg,,excluded: non-EEG signal,12
+tuar,DC3-DC,non_eeg,,excluded: non-EEG signal,12
+tuar,DC4-DC,non_eeg,,excluded: non-EEG signal,12
+tuar,DC5-DC,non_eeg,,excluded: non-EEG signal,12
+tuar,DC6-DC,non_eeg,,excluded: non-EEG signal,12
+tuar,DC7-DC,non_eeg,,excluded: non-EEG signal,12
+tuar,DC8-DC,non_eeg,,excluded: non-EEG signal,12
+tuar,EEG 100-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 101-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 102-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 103-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 104-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 105-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 106-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 107-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 108-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 109-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 110-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 111-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 112-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 113-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 114-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 115-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 116-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 117-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 118-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 119-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 120-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 121-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 122-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 123-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 124-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 125-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 126-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 127-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 128-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 20-REF,numbered,,excluded: numbered channel with no electrode position,2
+tuar,EEG 21-REF,numbered,,excluded: numbered channel with no electrode position,5
+tuar,EEG 22-REF,numbered,,excluded: numbered channel with no electrode position,5
+tuar,EEG 23-REF,numbered,,excluded: numbered channel with no electrode position,2
+tuar,EEG 24-REF,numbered,,excluded: numbered channel with no electrode position,2
+tuar,EEG 25-REF,numbered,,excluded: numbered channel with no electrode position,5
+tuar,EEG 26-LE,numbered,,excluded: numbered channel with no electrode position,12
+tuar,EEG 26-REF,numbered,,excluded: numbered channel with no electrode position,123
+tuar,EEG 27-LE,numbered,,excluded: numbered channel with no electrode position,12
+tuar,EEG 27-REF,numbered,,excluded: numbered channel with no electrode position,119
+tuar,EEG 28-LE,numbered,,excluded: numbered channel with no electrode position,12
+tuar,EEG 28-REF,numbered,,excluded: numbered channel with no electrode position,119
+tuar,EEG 29-LE,numbered,,excluded: numbered channel with no electrode position,12
+tuar,EEG 29-REF,numbered,,excluded: numbered channel with no electrode position,121
+tuar,EEG 30-LE,numbered,,excluded: numbered channel with no electrode position,13
+tuar,EEG 30-REF,numbered,,excluded: numbered channel with no electrode position,121
+tuar,EEG 31-LE,numbered,,excluded: numbered channel with no electrode position,12
+tuar,EEG 31-REF,numbered,,excluded: numbered channel with no electrode position,79
+tuar,EEG 32-LE,numbered,,excluded: numbered channel with no electrode position,12
+tuar,EEG 32-REF,numbered,,excluded: numbered channel with no electrode position,79
+tuar,EEG 33-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 34-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 35-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 36-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 37-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 38-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 39-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 40-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 41-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 42-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 43-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 44-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 45-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 46-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 47-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 48-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 49-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 50-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 51-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 52-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 53-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 54-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 55-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 56-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 57-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 58-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 59-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 60-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 61-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 62-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 63-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 64-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 65-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 66-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 67-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 68-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 69-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 70-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 71-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 72-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 73-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 74-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 75-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 76-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 77-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 78-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 79-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 80-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 81-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 82-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 83-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 84-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 85-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 86-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 87-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 88-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 89-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 90-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 91-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 92-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 93-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 94-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 95-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 96-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 97-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 98-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG 99-REF,numbered,,excluded: numbered channel with no electrode position,3
+tuar,EEG A1-LE,electrode,A1 (ref LE),"recognized, not needed for the montage",13
+tuar,EEG A1-REF,electrode,A1 (ref REF),"recognized, not needed for the montage",290
+tuar,EEG A2-LE,electrode,A2 (ref LE),"recognized, not needed for the montage",13
+tuar,EEG A2-REF,electrode,A2 (ref REF),"recognized, not needed for the montage",290
+tuar,EEG C3-LE,electrode,C3 (ref LE),used,13
+tuar,EEG C3-REF,electrode,C3 (ref REF),used,297
+tuar,EEG C3P-REF,electrode,C3P (ref REF),"recognized, not needed for the montage",55
+tuar,EEG C4-LE,electrode,C4 (ref LE),used,13
+tuar,EEG C4-REF,electrode,C4 (ref REF),used,297
+tuar,EEG C4P-REF,electrode,C4P (ref REF),"recognized, not needed for the montage",55
+tuar,EEG CZ-LE,electrode,Cz (ref LE),used,13
+tuar,EEG CZ-REF,electrode,Cz (ref REF),used,297
+tuar,EEG EKG-LE,non_eeg,,excluded: non-EEG signal,13
+tuar,EEG EKG-REF,non_eeg,,excluded: non-EEG signal,7
+tuar,EEG EKG1-REF,non_eeg,,excluded: non-EEG signal,288
+tuar,EEG F3-LE,electrode,F3 (ref LE),used,13
+tuar,EEG F3-REF,electrode,F3 (ref REF),used,297
+tuar,EEG F4-LE,electrode,F4 (ref LE),used,13
+tuar,EEG F4-REF,electrode,F4 (ref REF),used,297
+tuar,EEG F7-LE,electrode,F7 (ref LE),used,13
+tuar,EEG F7-REF,electrode,F7 (ref REF),used,297
+tuar,EEG F8-LE,electrode,F8 (ref LE),used,13
+tuar,EEG F8-REF,electrode,F8 (ref REF),used,297
+tuar,EEG FP1-LE,electrode,Fp1 (ref LE),used,13
+tuar,EEG FP1-REF,electrode,Fp1 (ref REF),used,297
+tuar,EEG FP2-LE,electrode,Fp2 (ref LE),used,13
+tuar,EEG FP2-REF,electrode,Fp2 (ref REF),used,297
+tuar,EEG FZ-LE,electrode,Fz (ref LE),used,13
+tuar,EEG FZ-REF,electrode,Fz (ref REF),used,297
+tuar,EEG LOC-REF,non_eeg,,excluded: non-EEG signal,203
+tuar,EEG LUC-LE,non_eeg,,excluded: non-EEG signal,1
+tuar,EEG LUC-REF,non_eeg,,excluded: non-EEG signal,4
+tuar,EEG O1-LE,electrode,O1 (ref LE),used,13
+tuar,EEG O1-REF,electrode,O1 (ref REF),used,297
+tuar,EEG O2-LE,electrode,O2 (ref LE),used,13
+tuar,EEG O2-REF,electrode,O2 (ref REF),used,297
+tuar,EEG OZ-LE,electrode,Oz (ref LE),"recognized, not needed for the montage",13
+tuar,EEG P3-LE,electrode,P3 (ref LE),used,13
+tuar,EEG P3-REF,electrode,P3 (ref REF),used,297
+tuar,EEG P4-LE,electrode,P4 (ref LE),used,13
+tuar,EEG P4-REF,electrode,P4 (ref REF),used,297
+tuar,EEG PG1-LE,electrode,PG1 (ref LE),"recognized, not needed for the montage",13
+tuar,EEG PG2-LE,electrode,PG2 (ref LE),"recognized, not needed for the montage",13
+tuar,EEG PZ-LE,electrode,Pz (ref LE),used,13
+tuar,EEG PZ-REF,electrode,Pz (ref REF),used,297
+tuar,EEG RESP1-REF,non_eeg,,excluded: non-EEG signal,4
+tuar,EEG RESP2-REF,non_eeg,,excluded: non-EEG signal,4
+tuar,EEG RLC-LE,non_eeg,,excluded: non-EEG signal,1
+tuar,EEG RLC-REF,non_eeg,,excluded: non-EEG signal,4
+tuar,EEG ROC-REF,non_eeg,,excluded: non-EEG signal,203
+tuar,EEG SP1-LE,electrode,SP1 (ref LE),"recognized, not needed for the montage",1
+tuar,EEG SP1-REF,electrode,SP1 (ref REF),"recognized, not needed for the montage",63
+tuar,EEG SP2-LE,electrode,SP2 (ref LE),"recognized, not needed for the montage",1
+tuar,EEG SP2-REF,electrode,SP2 (ref REF),"recognized, not needed for the montage",63
+tuar,EEG T1-LE,electrode,T1 (ref LE),"recognized, not needed for the montage",1
+tuar,EEG T1-REF,electrode,T1 (ref REF),"recognized, not needed for the montage",295
+tuar,EEG T2-LE,electrode,T2 (ref LE),"recognized, not needed for the montage",1
+tuar,EEG T2-REF,electrode,T2 (ref REF),"recognized, not needed for the montage",295
+tuar,EEG T3-LE,electrode,T7 (ref LE),used,13
+tuar,EEG T3-REF,electrode,T7 (ref REF),used,297
+tuar,EEG T4-LE,electrode,T8 (ref LE),used,13
+tuar,EEG T4-REF,electrode,T8 (ref REF),used,297
+tuar,EEG T5-LE,electrode,P7 (ref LE),used,13
+tuar,EEG T5-REF,electrode,P7 (ref REF),used,297
+tuar,EEG T6-LE,electrode,P8 (ref LE),used,13
+tuar,EEG T6-REF,electrode,P8 (ref REF),used,297
+tuar,EMG-REF,non_eeg,,excluded: non-EEG signal,148
+tuar,IBI,non_eeg,,excluded: non-EEG signal,288
+tuar,PHOTIC PH,non_eeg,,excluded: non-EEG signal,13
+tuar,PHOTIC-REF,non_eeg,,excluded: non-EEG signal,211
+tuar,SUPPR,non_eeg,,excluded: non-EEG signal,288
+tusz,BURSTS,non_eeg,,excluded: non-EEG signal,6287
+tusz,DC1-DC,non_eeg,,excluded: non-EEG signal,334
+tusz,DC2-DC,non_eeg,,excluded: non-EEG signal,334
+tusz,DC3-DC,non_eeg,,excluded: non-EEG signal,334
+tusz,DC4-DC,non_eeg,,excluded: non-EEG signal,334
+tusz,DC5-DC,non_eeg,,excluded: non-EEG signal,334
+tusz,DC6-DC,non_eeg,,excluded: non-EEG signal,334
+tusz,DC7-DC,non_eeg,,excluded: non-EEG signal,334
+tusz,DC8-DC,non_eeg,,excluded: non-EEG signal,334
+tusz,ECG EKG-REF,non_eeg,,excluded: non-EEG signal,15
+tusz,EEG 100-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 101-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 102-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 103-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 104-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 105-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 106-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 107-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 108-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 109-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 110-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 111-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 112-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 113-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 114-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 115-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 116-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 117-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 118-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 119-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 120-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 121-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 122-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 123-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 124-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 125-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 126-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 127-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 128-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 20-REF,numbered,,excluded: numbered channel with no electrode position,536
+tusz,EEG 21-REF,numbered,,excluded: numbered channel with no electrode position,542
+tusz,EEG 22-REF,numbered,,excluded: numbered channel with no electrode position,542
+tusz,EEG 23-LE,numbered,,excluded: numbered channel with no electrode position,15
+tusz,EEG 23-REF,numbered,,excluded: numbered channel with no electrode position,536
+tusz,EEG 24-LE,numbered,,excluded: numbered channel with no electrode position,15
+tusz,EEG 24-REF,numbered,,excluded: numbered channel with no electrode position,536
+tusz,EEG 25-REF,numbered,,excluded: numbered channel with no electrode position,543
+tusz,EEG 26-LE,numbered,,excluded: numbered channel with no electrode position,373
+tusz,EEG 26-REF,numbered,,excluded: numbered channel with no electrode position,843
+tusz,EEG 27-LE,numbered,,excluded: numbered channel with no electrode position,373
+tusz,EEG 27-REF,numbered,,excluded: numbered channel with no electrode position,833
+tusz,EEG 28-LE,numbered,,excluded: numbered channel with no electrode position,498
+tusz,EEG 28-REF,numbered,,excluded: numbered channel with no electrode position,833
+tusz,EEG 29-LE,numbered,,excluded: numbered channel with no electrode position,498
+tusz,EEG 29-REF,numbered,,excluded: numbered channel with no electrode position,1651
+tusz,EEG 30-LE,numbered,,excluded: numbered channel with no electrode position,573
+tusz,EEG 30-REF,numbered,,excluded: numbered channel with no electrode position,1651
+tusz,EEG 31-LE,numbered,,excluded: numbered channel with no electrode position,358
+tusz,EEG 31-REF,numbered,,excluded: numbered channel with no electrode position,3864
+tusz,EEG 32-LE,numbered,,excluded: numbered channel with no electrode position,358
+tusz,EEG 32-REF,numbered,,excluded: numbered channel with no electrode position,3864
+tusz,EEG 33-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 34-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 35-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 36-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 37-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 38-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 39-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 40-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 41-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 42-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 43-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 44-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 45-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 46-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 47-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 48-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 49-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 50-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 51-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 52-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 53-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 54-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 55-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 56-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 57-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 58-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 59-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 60-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 61-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 62-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 63-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 64-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 65-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 66-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 67-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 68-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 69-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 70-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 71-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 72-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 73-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 74-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 75-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 76-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 77-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 78-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 79-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 80-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 81-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 82-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 83-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 84-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 85-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 86-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 87-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 88-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 89-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 90-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 91-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 92-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 93-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 94-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 95-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 96-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 97-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 98-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG 99-REF,numbered,,excluded: numbered channel with no electrode position,75
+tusz,EEG A1-LE,electrode,A1 (ref LE),"recognized, not needed for the montage",573
+tusz,EEG A1-REF,electrode,A1 (ref REF),"recognized, not needed for the montage",6101
+tusz,EEG A2-LE,electrode,A2 (ref LE),"recognized, not needed for the montage",573
+tusz,EEG A2-REF,electrode,A2 (ref REF),"recognized, not needed for the montage",6101
+tusz,EEG C3-LE,electrode,C3 (ref LE),used,573
+tusz,EEG C3-REF,electrode,C3 (ref REF),used,7567
+tusz,EEG C3P-REF,electrode,C3P (ref REF),"recognized, not needed for the montage",3216
+tusz,EEG C4-LE,electrode,C4 (ref LE),used,573
+tusz,EEG C4-REF,electrode,C4 (ref REF),used,7567
+tusz,EEG C4P-REF,electrode,C4P (ref REF),"recognized, not needed for the montage",3216
+tusz,EEG CZ-LE,electrode,Cz (ref LE),used,573
+tusz,EEG CZ-REF,electrode,Cz (ref REF),"recognized, not needed for the montage",625
+tusz,EEG CZ-REF,electrode,Cz (ref REF),used,6942
+tusz,EEG EKG-LE,non_eeg,,excluded: non-EEG signal,573
+tusz,EEG EKG-REF,non_eeg,,excluded: non-EEG signal,119
+tusz,EEG EKG1-REF,non_eeg,,excluded: non-EEG signal,6894
+tusz,EEG F3-LE,electrode,F3 (ref LE),used,573
+tusz,EEG F3-REF,electrode,F3 (ref REF),used,7567
+tusz,EEG F4-LE,electrode,F4 (ref LE),used,573
+tusz,EEG F4-REF,electrode,F4 (ref REF),used,7567
+tusz,EEG F7-LE,electrode,F7 (ref LE),used,573
+tusz,EEG F7-REF,electrode,F7 (ref REF),used,7567
+tusz,EEG F8-LE,electrode,F8 (ref LE),used,573
+tusz,EEG F8-REF,electrode,F8 (ref REF),used,7567
+tusz,EEG FP1-LE,electrode,Fp1 (ref LE),used,573
+tusz,EEG FP1-REF,electrode,Fp1 (ref REF),used,7567
+tusz,EEG FP2-LE,electrode,Fp2 (ref LE),used,573
+tusz,EEG FP2-REF,electrode,Fp2 (ref REF),used,7567
+tusz,EEG FZ-LE,electrode,Fz (ref LE),used,573
+tusz,EEG FZ-REF,electrode,Fz (ref REF),used,6942
+tusz,EEG LOC-REF,non_eeg,,excluded: non-EEG signal,1410
+tusz,EEG LUC-LE,non_eeg,,excluded: non-EEG signal,75
+tusz,EEG LUC-REF,non_eeg,,excluded: non-EEG signal,113
+tusz,EEG O1-LE,electrode,O1 (ref LE),used,573
+tusz,EEG O1-REF,electrode,O1 (ref REF),used,7567
+tusz,EEG O2-LE,electrode,O2 (ref LE),used,573
+tusz,EEG O2-REF,electrode,O2 (ref REF),used,7567
+tusz,EEG OZ-LE,electrode,Oz (ref LE),"recognized, not needed for the montage",573
+tusz,EEG OZ-REF,electrode,Oz (ref REF),"recognized, not needed for the montage",15
+tusz,EEG P3-LE,electrode,P3 (ref LE),used,573
+tusz,EEG P3-REF,electrode,P3 (ref REF),used,7567
+tusz,EEG P4-LE,electrode,P4 (ref LE),used,573
+tusz,EEG P4-REF,electrode,P4 (ref REF),used,7567
+tusz,EEG PG1-LE,electrode,PG1 (ref LE),"recognized, not needed for the montage",558
+tusz,EEG PG2-LE,electrode,PG2 (ref LE),"recognized, not needed for the montage",558
+tusz,EEG PZ-LE,electrode,Pz (ref LE),used,573
+tusz,EEG PZ-REF,electrode,Pz (ref REF),used,6942
+tusz,EEG RESP1-REF,non_eeg,,excluded: non-EEG signal,113
+tusz,EEG RESP2-REF,non_eeg,,excluded: non-EEG signal,113
+tusz,EEG RLC-LE,non_eeg,,excluded: non-EEG signal,75
+tusz,EEG RLC-REF,non_eeg,,excluded: non-EEG signal,113
+tusz,EEG ROC-REF,non_eeg,,excluded: non-EEG signal,1410
+tusz,EEG SP1-LE,electrode,SP1 (ref LE),"recognized, not needed for the montage",200
+tusz,EEG SP1-REF,electrode,SP1 (ref REF),"recognized, not needed for the montage",3304
+tusz,EEG SP2-LE,electrode,SP2 (ref LE),"recognized, not needed for the montage",200
+tusz,EEG SP2-REF,electrode,SP2 (ref REF),"recognized, not needed for the montage",3185
+tusz,EEG T1-LE,electrode,T1 (ref LE),"recognized, not needed for the montage",215
+tusz,EEG T1-REF,electrode,T1 (ref REF),"recognized, not needed for the montage",6389
+tusz,EEG T2-LE,electrode,T2 (ref LE),"recognized, not needed for the montage",215
+tusz,EEG T2-REF,electrode,T2 (ref REF),"recognized, not needed for the montage",6389
+tusz,EEG T3-LE,electrode,T7 (ref LE),used,573
+tusz,EEG T3-REF,electrode,T7 (ref REF),used,7567
+tusz,EEG T4-LE,electrode,T8 (ref LE),used,573
+tusz,EEG T4-REF,electrode,T8 (ref REF),used,7567
+tusz,EEG T5-LE,electrode,P7 (ref LE),used,573
+tusz,EEG T5-REF,electrode,P7 (ref REF),used,7567
+tusz,EEG T6-LE,electrode,P8 (ref LE),used,573
+tusz,EEG T6-REF,electrode,P8 (ref REF),used,7567
+tusz,EMG-REF,non_eeg,,excluded: non-EEG signal,2521
+tusz,IBI,non_eeg,,excluded: non-EEG signal,6287
+tusz,PHOTIC PH,non_eeg,,excluded: non-EEG signal,558
+tusz,PHOTIC-REF,non_eeg,,excluded: non-EEG signal,1332
+tusz,PULSE RATE,non_eeg,,excluded: non-EEG signal,15
+tusz,RESP ABDOMEN-REF,non_eeg,,excluded: non-EEG signal,100
+tusz,SUPPR,non_eeg,,excluded: non-EEG signal,6287
