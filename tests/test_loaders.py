@@ -103,10 +103,57 @@ def test_subject_ids_and_siena_times(tmp_path):
         "Seizure n 1:\nFile name: PNO6-1.edf\nRegistration start time: 23.49.00\n"
         "Seizure start time: 00.05.00\nSeizure end time: 00.06.30\n")
     notes = []
-    recs = {r.rel_path.split("/")[-1]: r for r in discover(root, notes=notes)}
+    recs = {r.rel_path.split("/")[-1]: r for r in discover(root, notes=notes, corrections=[])}
     assert recs["chb21_01.edf"].subject == recs["chb01_01.edf"].subject == "chbmit:chb01"
     assert recs["aaaaaaac_s001_t000.edf"].subject == recs["aaaaaaac_s003_t000.edf"].subject == "tuh:aaaaaaac"
     # Siena: 23:50:00 start, seizure at 00:05:00 -> 15 min in; typo in file name corrected and logged
     assert recs["PN06-1.edf"].seizures == [(900.0, 990.0)]
     assert any("letter O typed for zero" in n for n in notes)
     assert any("the EDF header time is used" in n for n in notes)  # 23:49 in list vs 23:50 in header
+    flag = recs["PN06-1.edf"].flags[0]
+    assert flag["alt"] == (960.0, 1050.0)  # timing if the list's 23:49 start were right
+
+
+def _rec(name, seizures, dataset="siena"):
+    from pathlib import Path
+    from preictal.data.loaders import Recording
+    return Recording(dataset, Path(name), name, "PN00", "siena:PN00", seizures=list(seizures))
+
+
+def test_corrections_set_offset_and_exclude():
+    from preictal.data.loaders import apply_corrections
+    a = _rec("PN00-3.edf", [(765.0, 4425.0)])
+    b = _rec("x_s016_t000.edf", [(0.0, 0.0), (16.7, 66.1)], dataset="tusz")
+    notes = []
+    apply_corrections([a, b], [
+        {"dataset": "siena", "recording": "PN00-3.edf", "seizure": 1, "expected_onset_s": 765,
+         "action": "set_offset_s", "value": 825, "reason": "hour typo"},
+        {"dataset": "tusz", "recording": "x_s016_t000.edf", "seizure": 1, "expected_onset_s": 0,
+         "action": "exclude", "reason": "zero length"},
+    ], notes)
+    assert a.seizures == [(765.0, 825.0)]
+    assert a.flags[0]["alt"] == (765.0, 4425.0)
+    assert b.seizures == [(16.7, 66.1)]
+    assert b.excluded == [(0.0, 0.0, "zero length")]
+    assert sum("correction applied" in n for n in notes) == 2
+
+
+def test_correction_skipped_when_onset_does_not_match():
+    from preictal.data.loaders import apply_corrections
+    a = _rec("PN00-3.edf", [(700.0, 4425.0)])
+    notes = []
+    apply_corrections([a], [{"dataset": "siena", "recording": "PN00-3.edf", "seizure": 1,
+                             "expected_onset_s": 765, "action": "set_offset_s", "value": 825,
+                             "reason": "x"}], notes)
+    assert a.seizures == [(700.0, 4425.0)]
+    assert "does not match" in notes[0]
+
+
+def test_repo_corrections_file_is_valid():
+    from preictal.data.loaders import DEFAULT_CORRECTIONS, load_corrections
+    entries = load_corrections(DEFAULT_CORRECTIONS)
+    assert entries, "configs/annotation_corrections.yaml should exist"
+    for c in entries:
+        assert {"dataset", "recording", "seizure", "expected_onset_s", "action", "reason"} <= set(c)
+        assert c["action"] in ("exclude", "set_onset_s", "set_offset_s")
+        assert c["action"] == "exclude" or "value" in c

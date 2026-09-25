@@ -1,0 +1,40 @@
+# Corrections to the datasets' own seizure annotations.
+#
+# The raw files in data/raw/ are never edited. The loader (src/preictal/data/loaders.py)
+# applies these entries and logs each one in results/d1/harmonization_check.md.
+#
+# Fields:
+#   dataset           chbmit | siena | tusz | tuar
+#   recording         EDF file name
+#   seizure           1-based, the recording's seizures in time order before any correction
+#   expected_onset_s  the annotation's onset before correction; if it doesn't match within
+#                     1 s, the correction is skipped and reported
+#   action            exclude | set_onset_s | set_offset_s
+#   value             new time in seconds from recording start (set_* actions only)
+#   reason            why, with the evidence
+#
+# Found by VT-05 on 2026-09-25.
+
+- dataset: siena
+  recording: PN00-3.edf
+  seizure: 1
+  expected_onset_s: 765
+  action: set_offset_s
+  value: 825
+  reason: >
+    The seizure list gives the end time as 19.29.29, which is after the list's own
+    registration end (18.57.13) and 61 min after onset (18.28.29). Assumed to be an hour
+    typo for 18.29.29, the smallest edit that fits; that makes the seizure 60 s long,
+    in line with PN00's other seizures. 18:29:29 is 825 s after the recording start
+    (18:15:44). To be confirmed by eye in results/d1/figures/flagged_*.
+
+- dataset: tusz
+  recording: aaaaapks_s016_t000.edf
+  seizure: 1
+  expected_onset_s: 0
+  action: exclude
+  reason: >
+    The .csv_bi file has a seizure row from 0.0000 to 0.0000 s (zero length), followed
+    by seven normal seizure rows. A zero-length event can't be labeled. Excluding it
+    doesn't change any labels, because the start of this file is within 4 h of the
+    other seizures and so isn't interictal anyway.

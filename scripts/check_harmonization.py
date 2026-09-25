@@ -132,7 +132,9 @@ def harmonized_length(hdr) -> int:
 
 def check_annotations(recs, out_dir):
     rows, problems = [], []
-    counts = Counter()
+    counts, excluded = Counter(), Counter()
+    for rec in recs:
+        excluded[rec.dataset] += len(rec.excluded)
     for rec in progress([r for r in recs if r.dataset in SEIZURE_DATASETS], None, "VT-05 annotations"):
         if not rec.seizures:
             continue
@@ -162,20 +164,62 @@ def check_annotations(recs, out_dir):
         audit = json.loads(audit_file.read_text())["datasets"]
         for ds in SEIZURE_DATASETS:
             expected = audit.get(ds, {}).get("seizures")
-            if expected is not None and expected != counts[ds]:
-                mismatches.append(f"{ds}: loader found {counts[ds]} seizures, VT-01 audit found {expected}")
+            if expected is not None and expected != counts[ds] + excluded[ds]:
+                mismatches.append(f"{ds}: loader found {counts[ds]} seizures plus {excluded[ds]} "
+                                  f"excluded by corrections; VT-01 audit found {expected}")
     else:
         mismatches.append("results/d1/data_audit_summary.json not found; run the VT-01 audit first")
     durations = [r["offset_s"] - r["onset_s"] for r in rows]
-    return {"rows": rows, "problems": problems, "counts": dict(counts), "mismatches": mismatches,
+    return {"rows": rows, "problems": problems, "counts": dict(counts), "excluded": dict(excluded),
+            "mismatches": mismatches,
             "duration_range": (min(durations), max(durations)) if durations else None}
 
 
-def plot_seizures(recs, out_dir, n_total=10, per_dataset=3, seed=0):
+def plot_segment(rec, h, onset, offset, title, path, anchor="onset"):
+    """Plot all 18 derivations around the onset (20 s before to 40 s after) or,
+    with anchor="offset", around the offset (40 s before to 20 s after).
+    Display only: 0.5-40 Hz filter, traces clipped at 2x the channel spacing."""
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
+    from scipy.signal import butter, sosfiltfilt
 
+    sos = butter(4, [0.5, 40], btype="band", fs=h.fs, output="sos")
+    center, before, after = (onset, 20, 40) if anchor == "onset" else (offset, 40, 20)
+    a = max(0, int((center - before) * h.fs))
+    b = min(h.n_samples, int((center + after) * h.fs))
+    if b - a < 100:
+        return False
+    t = np.arange(a, b) / h.fs
+    shown = {j: sosfiltfilt(sos, h.data[j, a:b]) for j in range(len(h.derivations)) if h.present[j]}
+    scale = np.median([np.median(np.abs(x)) for x in shown.values()]) if shown else 1.0
+    spacing = max(20.0, 8 * scale)
+    fig, ax = plt.subplots(figsize=(12, 8))
+    for j, name in enumerate(h.derivations):
+        y = -j * spacing
+        if j in shown:
+            ax.plot(t, np.clip(shown[j], -2 * spacing, 2 * spacing) + y, lw=0.5, color="black")
+        ax.text(t[0] - 0.3, y, name, ha="right", va="center", fontsize=7,
+                color="black" if h.present[j] else "lightgrey")
+    if onset >= t[0]:
+        ax.axvline(onset, color="red", lw=1.2, label="onset")
+    if offset <= t[-1]:
+        ax.axvline(offset, color="blue", lw=1.2, label="offset")
+    ax.set_yticks([])
+    ax.set_xlim(t[0], t[-1])
+    ax.set_xlabel("time from recording start (s)")
+    ax.set_title(f"{title}\n{rec.dataset}: {Path(rec.rel_path).name}, onset {onset:.1f} s, "
+                 f"offset {offset:.1f} s | display: 0.5-40 Hz, spacing {spacing:.0f} uV, clipped at 2x spacing",
+                 fontsize=9)
+    ax.legend(loc="upper right", fontsize=8)
+    fig.tight_layout()
+    fig.savefig(path, dpi=110)
+    plt.close(fig)
+    return True
+
+
+def plot_seizures(recs, out_dir, n_total=10, per_dataset=3, seed=0):
+    """VT-05 visual review: seizures chosen at random with a fixed seed."""
     rng = random.Random(seed)
     pool = {ds: [(r, k) for r in recs if r.dataset == ds for k in range(len(r.seizures))]
             for ds in SEIZURE_DATASETS}
@@ -185,44 +229,45 @@ def plot_seizures(recs, out_dir, n_total=10, per_dataset=3, seed=0):
     rest = [x for ds in SEIZURE_DATASETS for x in pool[ds] if x not in chosen]
     chosen += rng.sample(rest, max(0, min(n_total - len(chosen), len(rest))))
 
-    from scipy.signal import butter, sosfiltfilt
-    sos = butter(4, [0.5, 40], btype="band", fs=TARGET_FS, output="sos")  # display only
-
     fig_dir = out_dir / "figures"
     fig_dir.mkdir(parents=True, exist_ok=True)
     written = []
     for i, (rec, k) in enumerate(chosen, 1):
         h = harmonize(read_header(rec.path))
         on, off = rec.seizures[k]
-        a = max(0, int((on - 20) * h.fs))           # 20 s before onset
-        b = min(h.n_samples, int((on + 40) * h.fs))  # 40 s after onset
-        t = np.arange(a, b) / h.fs
-        shown = {j: sosfiltfilt(sos, h.data[j, a:b]) for j in range(len(h.derivations))
-                 if h.present[j] and b - a > 100}
-        scale = np.median([np.median(np.abs(x)) for x in shown.values()]) if shown else 1.0
-        spacing = max(20.0, 8 * scale)
-        fig, ax = plt.subplots(figsize=(12, 8))
-        for j, name in enumerate(h.derivations):
-            y = -j * spacing
-            if j in shown:
-                ax.plot(t, np.clip(shown[j], -2 * spacing, 2 * spacing) + y, lw=0.5, color="black")
-            ax.text(t[0] - 0.3, y, name, ha="right", va="center", fontsize=7,
-                    color="black" if h.present[j] else "lightgrey")
-        ax.axvline(on, color="red", lw=1.2, label="annotated onset")
-        if off <= t[-1]:
-            ax.axvline(off, color="blue", lw=1.2, label="annotated offset")
-        ax.set_yticks([])
-        ax.set_xlim(t[0], t[-1])
-        ax.set_xlabel("time from recording start (s)")
-        ax.set_title(f"{rec.dataset}: {Path(rec.rel_path).name}, seizure {k + 1} "
-                     f"(onset {on:.1f} s, offset {off:.1f} s) | display filter 0.5-40 Hz, "
-                     f"spacing {spacing:.0f} uV", fontsize=10)
-        ax.legend(loc="upper right", fontsize=8)
-        fig.tight_layout()
         name = f"seizure_{i:02d}_{rec.dataset}.png"
-        fig.savefig(fig_dir / name, dpi=110)
-        plt.close(fig)
+        plot_segment(rec, h, on, off, f"Random review {i} (seed {seed}), seizure {k + 1}",
+                     fig_dir / name)
         written.append((name, rec.rel_path, k + 1))
+    return written
+
+
+def plot_flagged(recs, out_dir):
+    """Every seizure the loader flagged: corrected annotations and conflicting start times.
+
+    Each flag gets two figures: the timing used, and the alternative (the original
+    annotation, or the timing implied by the Siena list's registration start).
+    """
+    fig_dir = out_dir / "figures"
+    fig_dir.mkdir(parents=True, exist_ok=True)
+    written, i = [], 0
+    for rec in recs:
+        if not rec.flags:
+            continue
+        h = harmonize(read_header(rec.path))
+        for flag in rec.flags:
+            i += 1
+            stem = f"flagged_{i:02d}_{rec.dataset}_{Path(rec.rel_path).stem}"
+            anchor = flag.get("changed", "onset")  # show the part of the seizure that was in question
+            used = plot_segment(rec, h, flag["onset"], flag["offset"], f"Timing used (around {anchor})",
+                                fig_dir / f"{stem}_used.png", anchor)
+            alt_on, alt_off = flag["alt"]
+            alt = plot_segment(rec, h, alt_on, alt_off, f"Alternative: {flag['alt_label']} (around {anchor})",
+                               fig_dir / f"{stem}_alternative.png", anchor)
+            written.append({"recording": rec.rel_path, "reason": flag["reason"],
+                            "used": f"{stem}_used.png" if used else "",
+                            "alternative": f"{stem}_alternative.png" if alt
+                            else f"not plotted ({flag['alt_label']} is outside the recording)"})
     return written
 
 
@@ -273,7 +318,7 @@ def check_amplitude(recs, out_dir, workers):
 
 # ---------------------------------------------------------------- report
 
-def write_report(out_dir, unit, ch, ann, figs, amp, n_recs, notes):
+def write_report(out_dir, unit, ch, ann, figs, flagged, amp, n_recs, notes):
     ok_unit, unit_line = unit
     vt02 = ok_unit and not ch["unmapped"]
     vt05 = ok_unit and not ann["problems"] and not ann["mismatches"]
@@ -335,7 +380,9 @@ def write_report(out_dir, unit, ch, ann, figs, amp, n_recs, notes):
             lines += ["", "Harmonization warnings:", ""]
             lines += [f"- {w} ({n} channels)" for w, n in amp["warnings"].most_common()]
     lines += ["", "## VT-05 annotations", "",
-              "Seizures checked per dataset: " + ", ".join(f"{k} {v}" for k, v in sorted(ann["counts"].items()))]
+              "Seizures checked per dataset: " + ", ".join(f"{k} {v}" for k, v in sorted(ann["counts"].items()))
+              + ". Excluded by corrections: " + (", ".join(f"{k} {v}" for k, v in sorted(ann["excluded"].items()) if v)
+                                                 or "none") + "."]
     if ann["duration_range"]:
         lo, hi = ann["duration_range"]
         lines.append(f"Seizure durations range from {lo:.1f} s to {hi:.1f} s.")
@@ -346,6 +393,17 @@ def write_report(out_dir, unit, ch, ann, figs, amp, n_recs, notes):
               "each onset marker lines up with a visible change in the EEG:", "",
               "| Figure | Recording | Seizure |", "|---|---|---|"]
     lines += [f"| [{f}](figures/{f}) | {rec} | {k} |" for f, rec, k in figs]
+    if flagged:
+        lines += ["", "## Flagged seizures for review", "",
+                  "Seizures whose annotation was corrected (configs/annotation_corrections.yaml) or whose "
+                  "Siena list disagrees with the EDF start time. Compare the two figures for each: the onset "
+                  "should line up with a visible change in the EEG in the 'used' figure.", "",
+                  "| Recording | Reason | Timing used | Alternative |", "|---|---|---|---|"]
+        for f in flagged:
+            alt = f"[{f['alternative']}](figures/{f['alternative']})" if f["alternative"].endswith(".png") \
+                else f["alternative"]
+            used = f"[{f['used']}](figures/{f['used']})" if f["used"] else "not plotted"
+            lines.append(f"| {f['recording']} | {f['reason']} | {used} | {alt} |")
     if notes:
         lines += ["", "## Loader notes", ""] + [f"- {x}" for x in notes]
     (out_dir / "harmonization_check.md").write_text("\n".join(lines) + "\n")
@@ -372,10 +430,13 @@ def main():
     ch = check_channels(recs, args.out)
     ann = check_annotations(recs, args.out)
     print("Plotting seizures for visual review...")
+    for old_fig in (args.out / "figures").glob("*.png"):
+        old_fig.unlink()  # so figures from earlier runs can't be mistaken for this one's
     figs = plot_seizures(recs, args.out)
+    flagged = plot_flagged(recs, args.out)
     amp = None if args.skip_amplitude else check_amplitude(recs, args.out, args.workers)
 
-    vt02, vt05 = write_report(args.out, unit, ch, ann, figs, amp, len(recs), notes)
+    vt02, vt05 = write_report(args.out, unit, ch, ann, figs, flagged, amp, len(recs), notes)
     print()
     print(f"VT-02 channel mapping:  {'PASS' if vt02 else 'FAIL'} ({len(ch['unmapped'])} unmapped EEG labels)")
     if amp is None:
@@ -385,6 +446,7 @@ def main():
               f"{len(amp['length_bad'])} length mismatches")
     print(f"VT-05 annotations:      {'PASS' if vt05 else 'FAIL'} ({len(ann['rows'])} seizures, "
           f"{len(ann['problems'])} problems, {len(ann['mismatches'])} count mismatches)")
+    print(f"Flagged seizures plotted for review: {len(flagged)}")
     print(f"Report: {args.out / 'harmonization_check.md'}")
 
 
