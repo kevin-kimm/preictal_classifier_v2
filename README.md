@@ -1,6 +1,6 @@
 # preictal_classifier_v2
 
-Cross-patient seizure forecasting from scalp EEG. The software watches a continuous EEG signal and warns the user when a seizure is likely to begin within the next 30 minutes, at least 30 seconds before onset so there is time to act.
+Cross-patient seizure forecasting from scalp EEG. The software watches a continuous EEG signal and warns the user when a seizure is likely to begin within the next 30 minutes, at least 5 seconds before onset.
 
 > **Research prototype.** This software is not a medical device, has not been clinically validated, and must not be used to make medical decisions.
 
@@ -12,14 +12,14 @@ preictal_classifier_v2 is a ground-up rebuild of the AuraSense seizure predictio
 
 | Component | What it does |
 |---|---|
-| Signal harmonization | Loads Siena, CHB-MIT and TUSZ recordings and converts them to one format: modern 10-20 channel names, a common sampling rate and a common montage. Recordings using older labels (T3, T4, T5, T6) and newer labels (T7, T8, P7, P8) can then be used together. |
+| Signal harmonization | Loads Siena, CHB-MIT and TUSZ recordings and converts them to one format: modern 10-20 channel names, a common sampling rate, and 18 bipolar derivations (the "double banana" montage). Using bipolar derivations also removes differences in reference electrode between datasets. Recordings using older labels (T3, T4, T5, T6) and newer labels (T7, T8, P7, P8) can then be used together. |
 | Montage-agnostic classifier | Accepts whatever channels are available and scores each window as preictal, ictal or interictal. It works with any electrode layout, including the AuraSense headband and the OpenBCI Cyton. |
 | Alarm logic | Converts the continuous risk score into discrete, non-repeating alarms, to limit alarm fatigue. |
 | User interface | Runs locally. Replays dataset recordings or streams live Cyton data, showing the EEG, risk score, alarms and alarm times. |
 
 ## Intended use (draft)
 
-*Software that analyzes continuous scalp EEG from a person with epilepsy and alerts that person when a seizure is likely to begin within the next 30 minutes, at least 30 seconds before onset, so they can move to a safe place or follow their seizure action plan.*
+*Software that analyzes continuous scalp EEG from a person with epilepsy and alerts that person when a seizure is likely to begin within the next 30 minutes and at least 5 seconds before onset, so they can move to a safe place or follow their seizure action plan.*
 
 As a provisional SaMD framing under the IMDRF risk categorization, the output drives an immediate user action in a condition that is at least serious, which would place it in Category II or higher. This framing guides the design and the rigor of verification for a course project; it is not a regulatory determination.
 
@@ -29,12 +29,12 @@ Development follows design-control practices in a lightweight form. Requirements
 
 | Term | Definition |
 |---|---|
-| Preictal | 30 min to 30 s before seizure onset: the period in which a correct warning must arrive |
-| Seizure prediction horizon | 30 s, the minimum warning time |
+| Preictal | 30 min to 5 s before seizure onset: the period in which a correct warning must arrive |
+| Seizure prediction horizon | 5 s, the minimum warning time |
 | Ictal | Seizure onset to offset, from expert annotations |
 | Interictal | At least 4 h away from any seizure |
 | Alarm | A discrete warning, followed by a 30 min period in which no new alarm is raised |
-| True alarm | An alarm followed by a seizure onset 30 s to 30 min later |
+| True alarm | An alarm followed by a seizure onset 5 s to 30 min later |
 
 Full rules, including edge cases such as clustered seizures and gaps in recordings, are in Section 3 of the [verification plan](docs/verification_plan.md).
 
@@ -46,7 +46,7 @@ The datasets are not included in this repository. Each has its own data use term
 |---|---|---|---|---|---|
 | Siena Scalp EEG Database | 1.0.0 | Training and LOPO testing | 14 adults with epilepsy | 512 Hz | Referential |
 | CHB-MIT Scalp EEG Database | 1.0.0 | Training and LOPO testing | 22 pediatric subjects (23 cases) | 256 Hz | Bipolar |
-| TUH EEG Seizure Corpus (TUSZ) | 2.0.6 | Training and LOPO testing | From data audit | Varies | Referential |
+| TUH EEG Seizure Corpus (TUSZ) | 2.0.6 | Training and cross-patient testing; patients without seizures used for false alarm testing | From data audit | Varies | Referential |
 | TUH EEG Artifact Corpus (TUAR) | 3.0.1 | Artifact robustness testing | From data audit | Varies | Referential |
 | EEG During Mental Arithmetic Tasks | 1.0.0 | False alarm testing in people without epilepsy | 36 healthy subjects | 500 Hz | Referential |
 
@@ -136,7 +136,7 @@ Tunable parameters, including the preictal window, sampling rate, alarm refracto
 
 ## Evaluation protocol
 
-Models are evaluated with cross-patient leave-one-patient-out (LOPO) validation: each patient is scored by a model that never saw any of their data. Five random seeds are fixed in advance and all five are reported. Alarm thresholds are chosen on a validation subset of the training patients only, never on the test patient.
+Models are evaluated with cross-patient leave-one-patient-out (LOPO) validation: each patient is scored by a model that never saw any of their data. If the number of eligible patients makes LOPO impractical on a laptop, patient-grouped 10-fold cross-validation is used instead, under a rule fixed in advance (decision D-6 in the verification plan). Five random seeds are fixed in advance and all five are reported. Alarm thresholds are chosen on a validation subset of the training patients only, never on the test patient.
 
 Window-level performance is measured by AUROC (preictal vs interictal) and a three-class confusion matrix. Event-level performance is measured by the fraction of seizures warned in time, false alarms per 24 hours, time spent in warning, and warning time, and is compared with a random predictor raising alarms at the same rate. Exact definitions and pass/fail criteria are in the [verification plan](docs/verification_plan.md).
 
@@ -176,7 +176,7 @@ A detailed comparison, including results, is part of the Deliverable 1 verificat
 |---|---|---|---|
 | 1 (40%) | Evaluation methods: seeds, threshold derivation, alarm logic, relabeling | 10% | In progress |
 | 1 | Harmonized loader for Siena, CHB-MIT and TUSZ | 10% | Not started |
-| 1 | Relabeled corpus (30 min to 30 s before onset) | 5% | Not started |
+| 1 | Relabeled corpus (30 min to 5 s before onset) | 5% | Not started |
 | 1 | Cross-patient LOPO classifier | 5% | Not started |
 | 1 | Verification test plan, written before testing | 5% | Draft |
 | 1 | Verification results against the plan | 5% | Not started |

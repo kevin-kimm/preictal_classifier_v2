@@ -4,15 +4,36 @@
 
 signal:
   target_fs_hz: 256                  # CHB-MIT native rate; Siena decimates by 2
-  montage: bipolar_longitudinal      # (VTP) decision D-4
+  montage: bipolar_longitudinal_18   # (VTP) decision D-4
+  derivations:                       # (VTP) common montage, modern 10-20 names
+    - Fp1-F7
+    - F7-T7
+    - T7-P7
+    - P7-O1
+    - Fp2-F8
+    - F8-T8
+    - T8-P8
+    - P8-O2
+    - Fp1-F3
+    - F3-C3
+    - C3-P3
+    - P3-O1
+    - Fp2-F4
+    - F4-C4
+    - C4-P4
+    - P4-O2
+    - Fz-Cz
+    - Cz-Pz
+  cyton_electrodes: [F7, T7, P7, O1, F8, T8, P8, O2]   # (VTP) live placement
   units: uV
 
 labels:
   preictal_start_min_before_onset: 30   # (VTP)
-  preictal_end_s_before_onset: 30       # (VTP) seizure prediction horizon, decision D-1
+  preictal_end_s_before_onset: 5        # (VTP) seizure prediction horizon, decision D-1
   interictal_min_gap_h: 4               # (VTP)
   cluster_merge_min: 30                 # (VTP) seizures closer than this are one event
   min_preictal_coverage: 0.9            # (VTP) fraction of the preictal period that must be recorded
+  tusz_no_seizure_patients: false_alarm_only   # (VTP) decision D-5
 
 windows:
   length_s: null        # set during Deliverable 1 development, before testing
@@ -25,6 +46,8 @@ alarm:
 
 evaluation:
   seeds: [0, 1, 2, 3, 4]              # (VTP) pre-registered; all are reported
+  cv_scheme: lopo                     # (VTP) D-6: switches to grouped_10fold if more than 40 eligible test patients
+  grouped_cv_patient_threshold: 40    # (VTP) decision D-6
   inner_validation_fraction: 0.2      # (VTP) training patients held out for thresholds
   bootstrap_resamples: 1000
   far_target_per_24h:
