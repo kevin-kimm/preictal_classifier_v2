@@ -1,9 +1,5 @@
 # Verification Test Plan: preictal_classifier_v2
 
-| Doc ID | Version | Author | Status |
-|---|---|---|---|
-| VTP-001 | 0.2 (draft) | Kevin Kim | Draft, not frozen |
-
 ## 1. Purpose
 
 This plan lists every test for Deliverables 1–3, how each one is run, and what counts as a pass or fail. I'm writing it before any testing and freezing it in Git as v1.0, so the commit history shows the criteria came first.
@@ -13,16 +9,6 @@ Results go in `docs/verification_results/` (one file per deliverable), including
 There are two kinds of test. Verification tests have a pass/fail threshold. Characterization tests measure and report something I don't have a defensible threshold for yet.
 
 ## 2. Decisions
-
-These were open questions or inconsistencies in the original course plan, settled in v0.2.
-
-**D-1. End of the preictal window.** 5 s before onset. Some earlier wording said 30 s.
-
-**D-2. D2 improvement target.** At least 15% relative improvement in mean cross-patient AUROC over D1, on the same folds and seeds. For example, if D1 gets 0.65, D2 needs 0.7475 or better.
-
-**D-3. D2 alarm target.** Event sensitivity of at least 80% with at most 5 false alarms per 24 h. Patient-specific studies report numbers in this range, but cross-patient results are usually worse, so this could fail. If it does, it gets reported as a fail.
-
-**D-4. Common montage.** All recordings are converted to the 18-channel longitudinal bipolar montage (double banana) with modern 10-20 names. CHB-MIT is already recorded this way and can't be converted back to referential, so this is the only format all the datasets share. Siena, TUSZ and the Cyton record referential signals, so bipolar channels come from subtracting electrode pairs. The subtraction also cancels the reference electrode, which removes the difference between TUSZ's average-reference and linked-ear recordings and the Cyton's SRB reference. Derivations with a missing electrode are marked absent, not interpolated.
 
 The 18 derivations:
 
