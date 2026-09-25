@@ -238,7 +238,7 @@ def siena_seizures(root: Path):
             if m:
                 current = m.group(1)
                 continue
-            if re.match(r"seizure\s+n\b", s, re.I):
+            if re.match(r"seizure\s+n\s*\d", s, re.I):
                 blocks += 1
                 continue
             if re.match(r"(seizure\s+)?start\s+time\s*:", s, re.I):
@@ -300,15 +300,32 @@ def summarize(rows, data_root: Path, do_hash: bool):
         notes["chbmit"].append("chb01 and chb21 are the same subject (per the CHB-MIT documentation); "
                                "group them as one patient for cross-patient splits")
 
+    siena_edfs = [r for r in by_ds.get("siena", []) if r["is_edf"]]
+    siena_by_patient = defaultdict(list)
+    for r in siena_edfs:
+        r["n_seizures"] = 0
+        siena_by_patient[r["patient"]].append(r)
     for folder in {r["folder"] for r in by_ds.get("siena", [])}:
         per_file, n = siena_seizures(data_root / folder)
         notes["siena"] += n
-        for name, count in per_file.items():
-            r = edf_by_name.get(("siena", name.lower()))
-            if r:
-                r["n_seizures"] = count
-            else:
+        for name, count in sorted(per_file.items()):
+            r, how = edf_by_name.get(("siena", name.lower())), ""
+            fixed = re.sub(r"^pno", "pn0", name.lower())  # letter O typed for zero, e.g. PNO6
+            if r is None and fixed != name.lower():
+                r = edf_by_name.get(("siena", fixed))
+                how = "letter O typed for zero"
+            if r is None:  # e.g. "PN01.edf" or "PN11-.edf" for a patient with a single EDF
+                m = re.match(r"pn\d+", fixed)
+                candidates = siena_by_patient.get(m.group(0).upper(), []) if m else []
+                if len(candidates) == 1:
+                    r, how = candidates[0], "only EDF for this patient"
+            if r is None:
                 notes["siena"].append(f"{name}: listed with {count} seizures but no matching EDF found")
+                continue
+            r["n_seizures"] += count
+            if how:
+                notes["siena"].append(f"Seizure list names '{name}'; matched to "
+                                      f"{Path(r['path']).name} ({how})")
 
     missing_csv_bi = 0
     for r in by_ds.get("tusz", []):
