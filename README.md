@@ -156,7 +156,7 @@ Window-level performance is measured by AUROC (preictal vs interictal) and a thr
 
 | Deliverable | Verification report | Status |
 |---|---|---|
-| 1. Rebuild and first evaluation | [`docs/verification_results/D1.md`](docs/verification_results/D1.md) | In progress (VT-01 to VT-07 passed) |
+| 1. Rebuild and first evaluation | [`docs/verification_results/D1.md`](docs/verification_results/D1.md) | VT-01 to VT-13 run (VT-13 failed); VT-14 remaining |
 | 2. Final prototype with alarm logic | `docs/verification_results/D2.md` | Not started |
 | 3. Interface and live Cyton test | `docs/verification_results/D3.md` | Not started |
 
@@ -164,11 +164,14 @@ Window-level performance is measured by AUROC (preictal vs interictal) and a thr
 
 | Metric | D1 | D2 | D3 (live) |
 |---|---|---|---|
-| Mean LOPO AUROC (± SD across seeds) | – | – | – |
-| Event sensitivity | – | – | Not applicable |
-| False alarms per 24 h | – | – | – |
-| Time in warning | – | – | – |
-| Median warning time | – | – | Not applicable |
+| Mean LOPO AUROC (± SD across seeds) | 0.556 ± 0.007 (95% CI 0.502–0.616) | – | – |
+| Clock-only baseline AUROC | 0.697 (seed 0) | – | Not applicable |
+| Event sensitivity | 0.21 (chance at this rate: 0.20) | – | Not applicable |
+| False alarms per 24 h, test patients | 10.61 | – | – |
+| False alarms per 24 h, TUSZ (unseen patients) | 69.67 | – | – |
+| Time in warning, median warning time | see [`lopo_report.md`](results/d1/lopo_report.md) | – | Not applicable |
+
+D1 is a deliberately simple, untuned baseline. It detects seizures well (AUROC 0.865 for windows inside a seizure) but predicts them only slightly better than chance, and a model that knows only the time of day does better (see findings F-18 to F-23 in the [D1 results](docs/verification_results/D1.md)).
 
 ## Comparison with v1
 
@@ -189,9 +192,9 @@ A detailed comparison, including results, is part of the Deliverable 1 verificat
 | 1 (40%) | Evaluation methods: seeds, threshold derivation, alarm logic, relabeling | 10% | Written ([evaluation_methods.md](docs/evaluation_methods.md)) |
 | 1 | Harmonized loader for Siena, CHB-MIT and TUSZ | 10% | Done |
 | 1 | Relabeled corpus (30 min to 5 s before onset) | 5% | Done |
-| 1 | Cross-patient LOPO classifier | 5% | Not started |
+| 1 | Cross-patient LOPO classifier | 5% | Done (VT-11 passed narrowly) |
 | 1 | Verification test plan, written before testing | 5% | Done (frozen, tag `vtp-1.0`) |
-| 1 | Verification results against the plan | 5% | In progress |
+| 1 | Verification results against the plan | 5% | VT-01 to VT-13 done |
 | 1 | Detailed comparison with v1 | – | Not started |
 | 2 (40%) | Classifier improved by at least 15% over D1 | 10% | Not started |
 | 2 | Alarm generation logic | 5% | Not started |
@@ -204,7 +207,7 @@ A detailed comparison, including results, is part of the Deliverable 1 verificat
 
 ## Known limitations
 
-These are known before testing and will be revisited in the final analysis. TUSZ recordings are short and their start times anonymized, so no TUSZ seizure has a usable preictal period; TUSZ is used only for false alarm testing in D1. Only 25 patients (21 CHB-MIT, 4 Siena) can be test patients, so results rest on a small group dominated by children's recordings. CHB-MIT is pediatric and recorded in a bipolar montage, which constrains the common representation for all datasets. Seizure onsets come from expert annotations, which carry their own uncertainty. The datasets were recorded with clinical equipment in hospital settings, which differs from a consumer headband. Live tests use seizure-free recordings, so they can measure false alarms but not whether seizures are predicted. The mental arithmetic recordings total only 2.4 h, which is too short to estimate a false alarm rate; they are used to check that task-related EEG changes don't trigger alarms.
+These are known before testing and will be revisited in the final analysis. TUSZ recordings are short and their start times anonymized, so no TUSZ seizure has a usable preictal period; TUSZ is used only for false alarm testing in D1. Only 25 patients (21 CHB-MIT, 4 Siena) can be test patients, so results rest on a small group dominated by children's recordings. CHB-MIT is pediatric and recorded in a bipolar montage, which constrains the common representation for all datasets. Seizure onsets come from expert annotations, which carry their own uncertainty. The datasets were recorded with clinical equipment in hospital settings, which differs from a consumer headband. In CHB-MIT and Siena, the time of day alone separates preictal from interictal periods better than the D1 EEG model, so EEG results must be compared with a clock-only baseline, not just with 0.5. Live tests use seizure-free recordings, so they can measure false alarms but not whether seizures are predicted. The mental arithmetic recordings total only 2.4 h, which is too short to estimate a false alarm rate; they are used to check that task-related EEG changes don't trigger alarms.
 
 ## Citations
 

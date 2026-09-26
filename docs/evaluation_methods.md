@@ -2,7 +2,7 @@
 
 | Doc | Version | Author | Written |
 |---|---|---|---|
-| EVM-001 | 1.0 | Kevin Kim | 2026-09-26, before any model was trained |
+| EVM-001 | 1.1 | Kevin Kim | v1.0 on 2026-09-26, before any model was trained; v1.1 after D1, before any D2 work |
 
 This document fixes how models are trained, tuned and scored for Deliverables 1 and 2. It adds detail to the verification plan (tag `vtp-1.0`) and doesn't change any of its pass/fail criteria. It is committed before any model is trained so the Git history shows these choices came first. Anything changed after results are seen goes in the version history (Section 11) with a reason.
 
@@ -88,13 +88,16 @@ For TUSZ and mental arithmetic, a "full" model is trained on all CHB-MIT and Sie
 
 ## 10. D2 experiments, fixed in advance
 
+**Reference baseline (added in v1.1).** Every AUROC from D2 on is reported next to a clock-only model: a logistic regression on the sine and cosine of the time of day, trained on the same training patients' preictal and interictal windows and tested on the same folds. In D1 it scored 0.697, higher than the EEG model (D1 finding F-18), so it is the bar a useful EEG model has to beat.
+
 Candidates are tried one at a time, in this order. Each is kept only if it improves the mean inner-validation AUROC across folds; test patients are never used to choose.
 
-1. **Context length:** 0, 2, 5 or 10 min of preceding windows, summarized by the mean and slope of each feature over that time.
-2. **Per-patient normalization:** each feature scaled by that recording's median and interquartile range over the preceding 30 min. It uses past data only, so it would work live.
-3. **TUSZ interictal in training:** on or off, with each patient weighted equally. As a check, I'll also report how well a model can tell which dataset a window came from.
-4. **Model family:** gradient boosting (D1) or a small neural network on the per-channel features with the same channel pooling.
-5. **Alarm smoothing and persistence:** risk averaged over 1, 6, 12 or 36 windows, and required to stay above threshold for 1, 3 or 6 windows. Chosen to give the highest inner-validation sensitivity with at most 5 false alarms per 24 h.
+1. **Per-patient normalization:** each feature scaled by that recording's median and interquartile range over the preceding 30 min. It uses past data only, so it would work live. Moved first in v1.1, because D1 showed risk scores sitting at very different levels for different patients (F-19).
+2. **Context length:** 0, 2, 5 or 10 min of preceding windows, summarized by the mean and slope of each feature over that time.
+3. **Time-of-day features (added in v1.1):** the sine and cosine of the clock time, which a live device would know. Part of the time-of-day effect may reflect when hospitals recorded rather than biology, so results are also reported without these features. TUSZ start times are anonymized, so if TUSZ is also kept (item 4), its windows get missing time features, and the dataset check in item 4 is repeated.
+4. **TUSZ interictal in training:** on or off, with each patient weighted equally. As a check, I'll also report how well a model can tell which dataset a window came from.
+5. **Model family:** gradient boosting (D1) or a small neural network on the per-channel features with the same channel pooling.
+6. **Alarm smoothing and persistence:** risk averaged over 1, 6, 12 or 36 windows, and required to stay above threshold for 1, 3 or 6 windows. Chosen to give the highest inner-validation sensitivity with at most 5 false alarms per 24 h.
 
 D2 is compared with D1 on the same folds and seeds (VT-15). As a robustness check, D2 is also evaluated without the seizures whose annotations were corrected or questioned (D1 findings F-06 and F-08).
 
@@ -103,3 +106,4 @@ D2 is compared with D1 on the same folds and seeds (VT-15). As a robustness chec
 | Version | Date | Change |
 |---|---|---|
 | 1.0 | 2026-09-26 | Written before any model was trained |
+| 1.1 | 2026-09-26 | After the D1 results and before any D2 work: added the clock-only reference baseline and time-of-day features, and moved per-patient normalization to first, based on D1 findings F-18 and F-19. Nothing about D1 changed |
