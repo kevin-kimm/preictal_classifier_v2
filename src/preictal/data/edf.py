@@ -94,16 +94,23 @@ def read_header(path: str | Path) -> EDFHeader:
     )
 
 
-def read_signals(hdr: EDFHeader, indices: list[int]) -> list[np.ndarray]:
-    """Read the given channels, scaled to the physical units in the header (float64)."""
+def read_signals(hdr: EDFHeader, indices: list[int], first_record: int = 0,
+                 n_records: int | None = None) -> list[np.ndarray]:
+    """Read the given channels, scaled to the physical units in the header (float64).
+
+    first_record and n_records select a stretch of data records (each record_s
+    seconds long) so long recordings can be read in pieces.
+    """
     spr = hdr.samples_per_record
     record_len = int(spr.sum())
     offsets = np.concatenate([[0], np.cumsum(spr)])
+    first_record = max(0, int(first_record))
+    last = hdr.n_records if n_records is None else min(hdr.n_records, first_record + int(n_records))
     data = np.memmap(hdr.path, dtype="<i2", mode="r", offset=hdr.header_bytes,
                      shape=(hdr.n_records, record_len))
     out = []
     for i in indices:
-        digital = np.asarray(data[:, offsets[i]:offsets[i + 1]], dtype=np.float64).reshape(-1)
+        digital = np.asarray(data[first_record:last, offsets[i]:offsets[i + 1]], dtype=np.float64).reshape(-1)
         span = hdr.dig_max[i] - hdr.dig_min[i]
         gain = (hdr.phys_max[i] - hdr.phys_min[i]) / span if span else 1.0
         out.append((digital - hdr.dig_min[i]) * gain + hdr.phys_min[i])

@@ -19,6 +19,7 @@ excluded with a reason, so nothing is dropped silently.
 
 from __future__ import annotations
 
+import math
 import re
 from dataclasses import dataclass, field
 from fractions import Fraction
@@ -250,6 +251,7 @@ class HarmonizedRecording:
     channel_log: list[dict]
     warnings: list[str]
     derivations: tuple = DERIVATIONS
+    t0: float = 0.0             # time of the first sample, seconds from recording start
 
     @property
     def n_samples(self) -> int:
@@ -274,12 +276,30 @@ def build_montage(plan: MontagePlan, signals: dict[int, np.ndarray], n: int) -> 
     return out
 
 
-def harmonize(hdr: EDFHeader, target_fs: float = TARGET_FS) -> HarmonizedRecording:
-    """Read one EDF and return it in the common format."""
+def harmonize(hdr: EDFHeader, target_fs: float = TARGET_FS, start_s: float = 0.0,
+              stop_s: float | None = None, pad_s: float = 2.0) -> HarmonizedRecording:
+    """Read one EDF and return it in the common format.
+
+    With start_s and stop_s, only that stretch is returned (t0 = start_s). The
+    read is padded by pad_s on each side and trimmed after resampling, so
+    samples match a whole-recording harmonization (resampling filters are much
+    shorter than the padding).
+    """
     plan = plan_montage(hdr.labels)
     warnings = []
     idx = plan.used_indices
-    raw = read_signals(hdr, idx) if idx else []
+    whole = start_s <= 0 and (stop_s is None or stop_s >= hdr.duration_s)
+    if whole:
+        r0, r1, trim = 0, hdr.n_records, None
+    else:
+        stop_s = hdr.duration_s if stop_s is None else min(stop_s, hdr.duration_s)
+        a, b = max(0.0, start_s - pad_s), min(hdr.duration_s, stop_s + pad_s)
+        r0 = int(math.floor(a / hdr.record_s))
+        r1 = min(hdr.n_records, int(math.ceil(b / hdr.record_s)))
+        seg_t0 = r0 * hdr.record_s
+        i0 = int(round((start_s - seg_t0) * target_fs))
+        trim = (i0, i0 + int(round((stop_s - start_s) * target_fs)))
+    raw = read_signals(hdr, idx, r0, r1 - r0) if idx else []
     signals = {}
     for i, x in zip(idx, raw):
         factor = microvolt_factor(hdr.units[i])
@@ -292,13 +312,19 @@ def harmonize(hdr: EDFHeader, target_fs: float = TARGET_FS) -> HarmonizedRecordi
         if max(len(s) for s in signals.values()) - n > 1:
             warnings.append("channels had different lengths after resampling; trimmed to the shortest")
     else:
-        n = int(round(hdr.duration_s * target_fs))
+        n = int(round((r1 - r0) * hdr.record_s * target_fs))
         warnings.append("no derivation could be built from this recording")
+    data = build_montage(plan, signals, n)
+    t0 = 0.0
+    if trim is not None:
+        data = data[:, trim[0]:min(trim[1], n)]
+        t0 = start_s
     return HarmonizedRecording(
-        data=build_montage(plan, signals, n),
+        data=data,
         present=plan.present,
         fs=float(target_fs),
         sources=[plan.source(k) for k in range(len(MONTAGE))],
         channel_log=plan.channel_log,
         warnings=warnings,
+        t0=t0,
     )
