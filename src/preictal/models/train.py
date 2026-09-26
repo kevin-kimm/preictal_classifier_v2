@@ -40,8 +40,12 @@ class Windows:
 
 
 def load_windows(feature_dir: Path, datasets: tuple[str, ...], subjects: set[str] | None = None,
-                 version: str | None = None) -> Windows:
-    parts = {k: [] for k in ("per_channel", "y", "t_end", "subject", "timeline")}
+                 version: str | None = None, keep_per_channel: bool = True,
+                 labels: tuple[int, ...] | None = None, every: int = 1) -> Windows:
+    """Load feature files. With keep_per_channel=False only the pooled features are kept
+    (per_channel is None), which saves memory. labels keeps only windows with those
+    labels; every=k keeps every k-th of those windows per recording."""
+    parts = {k: [] for k in ("per_channel", "X", "y", "t_end", "subject", "timeline")}
     subj_codes, tl_codes = {}, {}
     for ds in datasets:
         for f in sorted((Path(feature_dir) / ds).glob("*.npz")):
@@ -52,16 +56,28 @@ def load_windows(feature_dir: Path, datasets: tuple[str, ...], subjects: set[str
             if version is not None and str(z["version"]) != version:
                 raise ValueError(f"{f.name} was made by feature version {z['version']}, expected {version}; "
                                  "re-run scripts/extract_features.py")
-            n = len(z["labels"])
-            parts["per_channel"].append(z["features"])
-            parts["y"].append(z["labels"])
-            parts["t_end"].append(z["t_end"])
+            keep = np.ones(len(z["labels"]), dtype=bool) if labels is None else np.isin(z["labels"], labels)
+            keep = np.flatnonzero(keep)[::every]
+            n = len(keep)
+            if n == 0:
+                continue
+            feats = z["features"][keep]
+            if keep_per_channel:
+                parts["per_channel"].append(feats)
+            else:
+                parts["X"].append(pool(feats))
+            parts["y"].append(z["labels"][keep])
+            parts["t_end"].append(z["t_end"][keep])
             parts["subject"].append(np.full(n, subj_codes.setdefault(subject, len(subj_codes)), np.int32))
             parts["timeline"].append(np.full(n, tl_codes.setdefault(str(z["timeline"]), len(tl_codes)), np.int32))
     if not parts["y"]:
         raise FileNotFoundError(f"no feature files for {datasets} in {feature_dir}")
-    per_channel = np.concatenate(parts["per_channel"])
-    return Windows(per_channel, pool(per_channel), np.concatenate(parts["y"]), np.concatenate(parts["t_end"]),
+    if keep_per_channel:
+        per_channel = np.concatenate(parts["per_channel"])
+        X = pool(per_channel)
+    else:
+        per_channel, X = None, np.concatenate(parts["X"])
+    return Windows(per_channel, X, np.concatenate(parts["y"]), np.concatenate(parts["t_end"]),
                    np.concatenate(parts["subject"]), np.concatenate(parts["timeline"]),
                    list(subj_codes), list(tl_codes))
 

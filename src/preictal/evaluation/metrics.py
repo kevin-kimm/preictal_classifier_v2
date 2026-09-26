@@ -126,6 +126,27 @@ def choose_threshold(seqs: list[Sequence], far_target_per_24h: float, step_s: fl
     return 1.0, float(false_alarm_rate(seqs, 1.0, step_s, **kw))
 
 
+def choose_threshold_bisect(seqs: list[Sequence], far_target_per_24h: float, step_s: float,
+                            n_candidates: int = 1000, **kw) -> tuple[float, float]:
+    """Same candidates and rule as choose_threshold, found by binary search.
+
+    Assumes the false alarm rate doesn't rise as the threshold rises, which holds
+    closely but not exactly with a refractory period. Used in D2, where the search
+    runs many more times (docs/evaluation_methods.md v1.2).
+    """
+    grid = np.linspace(0.0, 1.0, n_candidates)
+    lo, hi = 0, n_candidates - 1
+    if not false_alarm_rate(seqs, grid[hi], step_s, **kw) <= far_target_per_24h:
+        return 1.0, float(false_alarm_rate(seqs, 1.0, step_s, **kw))
+    while lo < hi:
+        mid = (lo + hi) // 2
+        if false_alarm_rate(seqs, grid[mid], step_s, **kw) <= far_target_per_24h:
+            hi = mid
+        else:
+            lo = mid + 1
+    return float(grid[lo]), float(false_alarm_rate(seqs, grid[lo], step_s, **kw))
+
+
 def chance_p_value(n_predicted: int, n_events: int, far_per_24h: float, sop_s: float = 1795.0) -> tuple[float, float]:
     """Probability that a random predictor with the same FAR predicts a seizure, and the one-sided p-value."""
     if n_events == 0 or math.isnan(far_per_24h):

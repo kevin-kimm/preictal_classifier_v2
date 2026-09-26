@@ -34,12 +34,9 @@ def candidates(scores: np.ndarray, threshold: float, smoothing: int = 1, persist
     above = smooth(scores, smoothing) >= threshold
     if persistence <= 1:
         return above
-    run = np.zeros(len(above), dtype=int)
-    count = 0
-    for i, a in enumerate(above):
-        count = count + 1 if a else 0
-        run[i] = count
-    return run >= persistence
+    idx = np.arange(len(above))
+    last_below = np.maximum.accumulate(np.where(above, -1, idx))   # most recent window below threshold
+    return idx - last_below >= persistence                          # length of the current run above it
 
 
 def alarm_times(times: np.ndarray, scores: np.ndarray, threshold: float, refractory_s: float = 1800.0,

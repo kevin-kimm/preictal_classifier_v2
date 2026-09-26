@@ -2,7 +2,7 @@
 
 | Doc | Version | Author | Written |
 |---|---|---|---|
-| EVM-001 | 1.1 | Kevin Kim | v1.0 on 2026-09-26, before any model was trained; v1.1 after D1, before any D2 work |
+| EVM-001 | 1.2 | Kevin Kim | v1.0 on 2026-09-26, before any model was trained; v1.1 and v1.2 after D1, before any D2 result |
 
 This document fixes how models are trained, tuned and scored for Deliverables 1 and 2. It adds detail to the verification plan (tag `vtp-1.0`) and doesn't change any of its pass/fail criteria. It is committed before any model is trained so the Git history shows these choices came first. Anything changed after results are seen goes in the version history (Section 11) with a reason.
 
@@ -99,7 +99,23 @@ Candidates are tried one at a time, in this order. Each is kept only if it impro
 5. **Model family:** gradient boosting (D1) or a small neural network on the per-channel features with the same channel pooling.
 6. **Alarm smoothing and persistence:** risk averaged over 1, 6, 12 or 36 windows, and required to stay above threshold for 1, 3 or 6 windows. Chosen to give the highest inner-validation sensitivity with at most 5 false alarms per 24 h.
 
-D2 is compared with D1 on the same folds and seeds (VT-15). As a robustness check, D2 is also evaluated without the seizures whose annotations were corrected or questioned (D1 findings F-06 and F-08).
+**How choices are made (v1.2).** Choices are made separately for each test patient's fold, which is stricter than choosing one setup from the average over all folds. An average over folds would include the test patient's own data, because every patient is an inner validation patient in some other folds.
+
+* **Comparing candidates.** In each fold, every candidate is trained on that fold's training patients and scored on its inner validation patients (mean per-patient AUROC), averaged over the five seeds.
+* **Keeping a candidate.** A candidate is kept only if it beats the current setup; ties keep the current setup.
+* **Using the choice.** The setup chosen for a fold is used only for that fold's test patient. A setup is also chosen the same way on all patients (inner draw as in Section 9), for the false-alarm sets and the final model.
+* **Selection fits.** To keep run time reasonable, selection fits use every second window (10 s apart; overlapping windows are highly redundant). Final models use all windows.
+
+**Implementation details (v1.2).**
+
+* **Normalization and context.** Both use the windows ending in the preceding 30 min (normalization) or 2, 5 or 10 min (context) on the same timeline, so they continue across consecutive files. They are computed on the 60 pooled features.
+* **Normalization limits.** Normalization needs at least 12 windows (1 min) of history and uses an interquartile-range floor of 0.001. Context slopes are per minute, and missing values are skipped.
+* **Time-of-day features.** Only CHB-MIT and Siena recordings placed on a timeline have real clock times. All other windows get missing time features.
+* **TUSZ patient split.** TUSZ patients are split in half with seed 0. Only half A can be used for training, with interictal windows taken 30 s apart. Half B is used only for false-alarm testing, so that test always stays on unseen patients.
+* **Alarm step.** Smoothing and persistence are chosen per fold by mean inner-validation sensitivity over the seeds, and the threshold is set per seed. The threshold search uses the same 1,000 candidates but a binary search, because it runs many more times than in D1. This assumes the false alarm rate doesn't rise with the threshold, which holds closely but not exactly with a refractory period.
+* **Model family (step 5).** The neural network is run after steps 1–4, once PyTorch is installed. If it is kept, the alarm step is repeated.
+
+D2 is compared with D1 on the same folds and seeds (VT-15), using D1's per-patient AUROC for the same seeds. As a robustness check, D2 is also evaluated without the seizures whose annotations were corrected or questioned (D1 findings F-06 and F-08).
 
 ## 11. Version history
 
@@ -107,3 +123,4 @@ D2 is compared with D1 on the same folds and seeds (VT-15). As a robustness chec
 |---|---|---|
 | 1.0 | 2026-09-26 | Written before any model was trained |
 | 1.1 | 2026-09-26 | After the D1 results and before any D2 work: added the clock-only reference baseline and time-of-day features, and moved per-patient normalization to first, based on D1 findings F-18 and F-19. Nothing about D1 changed |
+| 1.2 | 2026-09-26 | Before any D2 result: choices made per fold (nested) instead of averaged over folds; implementation details for normalization, context, time-of-day features, the TUSZ patient split and the alarm step; selection fits on every second window; binary threshold search in D2 |

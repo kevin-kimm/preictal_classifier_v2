@@ -79,3 +79,16 @@ def test_window_metrics():
 def test_bootstrap_ci_contains_mean():
     lo, hi = bootstrap_ci([0.5, 0.6, 0.7, 0.8], n=500)
     assert lo <= 0.65 <= hi
+
+
+def test_bisect_matches_linear_scan_when_far_is_monotone():
+    from preictal.evaluation.metrics import choose_threshold_bisect
+    s = seq(24)
+    s.scores = np.linspace(0, 1, len(s.times))
+    assert choose_threshold_bisect([s], 10, STEP, 101) == choose_threshold([s], 10, STEP, 101)
+
+
+def test_persistence_run_length():
+    from preictal.alarm.alarm import candidates
+    x = np.array([0, 1, 1, 0, 1, 1, 1, 1], dtype=float)
+    assert candidates(x, 0.5, persistence=3).tolist() == [False] * 6 + [True, True]
