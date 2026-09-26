@@ -10,17 +10,18 @@ Steps, in order:
     context     0, 2, 5, 10 min  mean and slope of each feature over the preceding minutes
     clock       off / on         time-of-day features (CHB-MIT and Siena only)
     tusz        off / on         TUSZ interictal windows (half of TUSZ patients) added to training
+    model       hgb / nn         gradient boosting, or the small neural network in
+                                 src/preictal/models/nn.py on the per-channel features
     alarm       smoothing x persistence grid; threshold = lowest with inner FAR <= 5 per 24 h;
                 the combination with the highest mean inner sensitivity is kept
-Step 5 (a neural network) runs separately once PyTorch is installed.
 
 Usage, from the repo root with .venv active:
-    python scripts/run_d2.py --seeds 0          quicker preview (roughly an hour)
-    python scripts/run_d2.py                    all five seeds (a few hours; run overnight)
+    python scripts/run_d2.py --seeds 0          quicker preview (a couple of hours)
+    python scripts/run_d2.py                    all five seeds (run overnight)
 
 Outputs in results/d2/: d2_report.md, d2_metrics.csv, d2_selection_log.csv,
-d2_false_alarm_sets.csv, d2_summary.json. Normalized features are cached in
-data/processed/d2_cache/ (not in Git).
+d2_false_alarm_sets.csv, d2_summary.json. Normalized and context features are cached
+in data/processed/d2_cache/ (not in Git), so later runs start faster.
 """
 
 from __future__ import annotations
@@ -59,6 +60,7 @@ from preictal.features.transforms import (  # noqa: E402
     clock_features, context_features, rolling_normalize, timeline_has_clock,
 )
 from preictal.models.model import build_model, predict_proba  # noqa: E402
+from preictal.models.nn import DeepSetsClassifier  # noqa: E402
 from preictal.models.train import TRAIN_CLASSES, load_windows, sample_weights  # noqa: E402
 
 try:
@@ -66,10 +68,12 @@ try:
 except ImportError:
     tqdm = None
 
-STEPS = ("normalize", "context", "clock", "tusz")
-OPTIONS = {"normalize": (False, True), "context": (0, 2, 5, 10), "clock": (False, True), "tusz": (False, True)}
+STEPS = ("normalize", "context", "clock", "tusz", "model")
+OPTIONS = {"normalize": (False, True), "context": (0, 2, 5, 10), "clock": (False, True), "tusz": (False, True),
+           "model": ("hgb", "nn")}
+N_POOLED = 60            # the first 60 columns of every feature matrix are the pooled features
 ALARM_GRID = [(s, p) for s in (1, 6, 12, 36) for p in (1, 3, 6)]
-SELECTION_EVERY = 2      # selection fits use every 2nd window (10 s apart); final models use all
+SELECTION_EVERY = 3      # selection fits use every 3rd window (15 s apart); final models use all
 TUSZ_EVERY = 6           # TUSZ interictal windows 30 s apart (non-overlapping)
 
 
@@ -79,47 +83,53 @@ class Config:
     context: int = 0
     clock: bool = False
     tusz: bool = False
+    model: str = "hgb"
 
     def features_key(self):
         return (self.normalize, self.context, self.clock)
 
     def label(self):
         return (f"norm={'on' if self.normalize else 'off'} ctx={self.context}min "
-                f"clock={'on' if self.clock else 'off'} tusz={'on' if self.tusz else 'off'}")
+                f"clock={'on' if self.clock else 'off'} tusz={'on' if self.tusz else 'off'} model={self.model}")
 
 
 # ---------------------------------------------------------------- feature sets
 
 class FeatureSet:
-    """Pooled features for one group of windows, with cached D2 transforms."""
+    """Features for one group of windows, with the D2 transforms cached on disk."""
 
     def __init__(self, W, name, cache_dir, version, clock_ok):
-        self.W, self.name = W, name
+        self.W, self.name, self.cache_dir, self.version = W, name, cache_dir, version
         self.clock = clock_features(W.t_end, clock_ok)
-        cache = cache_dir / f"{name}_norm_{version}.npy"
-        if cache.exists():
-            self.norm = np.load(cache)
-        else:
-            print(f"  normalizing {name} features (one-off, cached)...")
-            self.norm = rolling_normalize(W.X, W.timeline, W.t_end)
-            cache_dir.mkdir(parents=True, exist_ok=True)
-            np.save(cache, self.norm)
-        self._ctx = {}
+        self.norm = self._cached("norm", lambda: rolling_normalize(W.X, W.timeline, W.t_end))
+
+    def _cached(self, tag, compute):
+        path = self.cache_dir / f"{self.name}_{tag}_{self.version}.npy"
+        if not path.exists():
+            print(f"  computing {self.name} {tag} features (one-off, cached)...")
+            self.cache_dir.mkdir(parents=True, exist_ok=True)
+            np.save(path, compute())
+        return np.load(path, mmap_mode="r")
 
     def context(self, normalize: bool, minutes: int):
-        key = (normalize, minutes)
-        if key not in self._ctx:
-            if len(self._ctx) >= 2:
-                self._ctx.pop(next(iter(self._ctx)))
-            base = self.norm if normalize else self.W.X
-            self._ctx[key] = context_features(base, self.W.timeline, self.W.t_end, minutes * 60)
-        return self._ctx[key]
+        base = self.norm if normalize else self.W.X
+        return self._cached(f"ctx{minutes}{'n' if normalize else 'r'}",
+                            lambda: context_features(np.asarray(base), self.W.timeline, self.W.t_end, minutes * 60))
+
+    def per_channel(self, normalize: bool):
+        """n x 18 x 15 inputs for the neural network (normalized per channel if asked)."""
+        pc = self.W.per_channel
+        if not normalize:
+            return pc
+        n = len(pc)
+        return self._cached("pcnorm", lambda: rolling_normalize(pc.reshape(n, -1), self.W.timeline,
+                                                                self.W.t_end).reshape(pc.shape))
 
     def build(self, key):
         normalize, minutes, clock = key
-        parts = [self.norm if normalize else self.W.X]
+        parts = [np.asarray(self.norm) if normalize else self.W.X]
         if minutes:
-            parts.append(self.context(normalize, minutes))
+            parts.append(np.asarray(self.context(normalize, minutes)))
         if clock:
             parts.append(self.clock)
         return np.hstack(parts) if len(parts) > 1 else parts[0]
@@ -200,7 +210,7 @@ def main():
     tl_info = json.loads((args.features / "timelines.json").read_text())
 
     print("Loading features...")
-    W = load_windows(args.features, datasets, version=version, keep_per_channel=False)
+    W = load_windows(args.features, datasets, version=version, keep_per_channel=True)
     FW = FeatureSet(W, "train", cache_dir, version, np.array([timeline_has_clock(k) for k in W.timelines])[W.timeline])
     print(f"  CHB-MIT and Siena: {len(W.y):,} windows")
 
@@ -208,7 +218,7 @@ def main():
     T = FT = None
     tusz_half_a, tusz_half_b = set(), set()
     if (args.features / "tusz").exists():
-        T = load_windows(args.features, ("tusz",), version=version, keep_per_channel=False, labels=(INTERICTAL,))
+        T = load_windows(args.features, ("tusz",), version=version, keep_per_channel=True, labels=(INTERICTAL,))
         FT = FeatureSet(T, "tusz", cache_dir, version, np.zeros(len(T.y), bool))
         names = sorted(T.subjects)
         rng = np.random.default_rng(0)
@@ -231,19 +241,33 @@ def main():
     def fold_of(fid, seed) -> Fold:
         return full_by_seed[seed] if fid == "full" else folds_by_seed[seed][fid]
 
-    def train_matrix(cfg_: Config, fold: Fold, XW, XT, every: int):
+    def train_rows(fold: Fold, every: int):
         r = every_other(W, W.rows(set(fold.train)), every)
-        r = r[np.isin(W.y[r], TRAIN_CLASSES)]                  # excluded windows are never trained on
-        X, y, subj = [XW[r]], [W.y[r]], [W.subject[r]]
-        if cfg_.tusz and T is not None:
-            X.append(XT[t_rows_a]); y.append(T.y[t_rows_a]); subj.append(T.subject[t_rows_a] + 10_000)
-        return np.vstack(X), np.concatenate(y), np.concatenate(subj)
+        return r[np.isin(W.y[r], TRAIN_CLASSES)]                  # excluded windows are never trained on
 
-    def fit_model(cfg_, fold, seed, XW, XT, every):
-        X, y, subj = train_matrix(cfg_, fold, XW, XT, every)
+    def fit_model(c: Config, fold: Fold, seed, XW, XT, every):
+        r = train_rows(fold, every)
+        use_t = c.tusz and T is not None
+        y = np.concatenate([W.y[r]] + ([T.y[t_rows_a]] if use_t else []))
+        subj = np.concatenate([W.subject[r]] + ([T.subject[t_rows_a] + 10_000] if use_t else []))
+        w = sample_weights(y, subj)
+        if c.model == "nn":
+            pc = np.concatenate([FW.per_channel(c.normalize)[r]] + ([FT.per_channel(c.normalize)[t_rows_a]] if use_t else []))
+            extra = None
+            if XW.shape[1] > N_POOLED:
+                extra = np.vstack([XW[r, N_POOLED:]] + ([XT[t_rows_a, N_POOLED:]] if use_t else []))
+            return DeepSetsClassifier(seed=seed).fit(pc, extra, y, w)
+        X = np.vstack([XW[r]] + ([XT[t_rows_a]] if use_t else []))
         model = build_model(seed)
-        model.fit(X, y, sample_weight=sample_weights(y, subj))
+        model.fit(X, y, sample_weight=w)
         return model
+
+    def predict(model, c: Config, FS, X, rows):
+        """Class probabilities (preictal, ictal, interictal) for the given rows."""
+        if c.model == "nn":
+            extra = X[rows, N_POOLED:] if X.shape[1] > N_POOLED else None
+            return model.predict_proba(FS.per_channel(c.normalize)[rows], extra)
+        return predict_proba(model, X[rows])
 
     # ---------------------------------------------------------------- selection (nested, per fold)
     inner_score = {}
@@ -266,7 +290,7 @@ def main():
                     fold = fold_of(fid, s)
                     model = fit_model(c, fold, s, XW, XT, SELECTION_EVERY)
                     r_inner = W.rows(set(fold.inner))
-                    inner_score[(fid, s, c)] = per_patient_auroc(W, r_inner, predict_proba(model, XW[r_inner])[:, 0])
+                    inner_score[(fid, s, c)] = per_patient_auroc(W, r_inner, predict(model, c, FW, XW, r_inner)[:, 0])
                     if bar:
                         bar.update(1)
         if bar:
@@ -304,17 +328,17 @@ def main():
                 model = fit_model(state[f], fold, s, XW, XT, 1)
                 r_inner = W.rows(set(fold.inner))
                 entry = {"model": model if f == "full" else None,
-                         "inner_seqs": sequences(W, r_inner, predict_proba(model, XW[r_inner])[:, 0], tl_info)}
+                         "inner_seqs": sequences(W, r_inner, predict(model, state[f], FW, XW, r_inner)[:, 0], tl_info)}
                 if f != "full":
                     r_test = W.rows({fold.test})
-                    entry.update(r_test=r_test, proba=predict_proba(model, XW[r_test]))
+                    entry.update(r_test=r_test, proba=predict(model, state[f], FW, XW, r_test))
                     if state[f].clock:
                         nc = replace(state[f], clock=False)
                         XW_nc = XW[:, :-2]                      # the clock features are the last two columns
                         XT_nc = XT[:, :-2] if (nc.tusz and XT is not None) else None
                         m2 = fit_model(nc, fold, s, XW_nc, XT_nc, 1)
                         entry["auroc_without_clock"] = window_metrics(
-                            W.y[r_test], predict_proba(m2, XW_nc[r_test]))["auroc"]
+                            W.y[r_test], predict(m2, nc, FW, XW_nc, r_test))["auroc"]
                 final[(f, s)] = entry
 
     alarm_choice = {}
@@ -383,24 +407,36 @@ def main():
 
     # ---------------------------------------------------------------- false-alarm sets and dataset check
     fa_rows, dataset_check = [], None
-    key = state["full"].features_key()
+    fa_setup = state["full"]
+    clock_removed = fa_setup.clock
+    if clock_removed:          # these recordings have no real clock time (v1.3)
+        fa_setup = replace(fa_setup, clock=False)
+    key = fa_setup.features_key()
     sets = []
     if FT is not None:
         sets.append(("tusz (held-out half)", T, FT, T.rows(tusz_half_b)))
     if (args.features / "mental_arith").exists():
-        M = load_windows(args.features, ("mental_arith",), version=version, keep_per_channel=False,
+        M = load_windows(args.features, ("mental_arith",), version=version, keep_per_channel=True,
                          labels=(INTERICTAL,))
         FM = FeatureSet(M, "mental_arith", cache_dir, version, np.zeros(len(M.y), bool))
         sets.append(("mental_arith", M, FM, np.arange(len(M.y))))
     built = {name: FD.build(key) for name, _, FD, _ in sets}
+    kw = dict(base_alarm, smoothing=alarm_choice["full"][0], persistence=alarm_choice["full"][1])
+    XW_fa = FW.build(key)
+    XT_fa = FT.build(key) if (FT is not None and fa_setup.tusz) else None
     for s in seeds:
-        e = final[("full", s)]
-        kw = dict(base_alarm, smoothing=alarm_choice["full"][0], persistence=alarm_choice["full"][1])
-        thr = choose_threshold_bisect(e["inner_seqs"], far_target, step_s, al["threshold_candidates"], **kw)[0]
+        fold = fold_of("full", s)
+        if clock_removed:
+            model = fit_model(fa_setup, fold, s, XW_fa, XT_fa, 1)
+            r_inner = W.rows(set(fold.inner))
+            inner = sequences(W, r_inner, predict(model, fa_setup, FW, XW_fa, r_inner)[:, 0], tl_info)
+        else:
+            model, inner = final[("full", s)]["model"], final[("full", s)]["inner_seqs"]
+        thr = choose_threshold_bisect(inner, far_target, step_s, al["threshold_candidates"], **kw)[0]
         for name, D, FD, rows in sets:
-            seqs = sequences(D, rows, predict_proba(e["model"], built[name][rows])[:, 0], tl_info)
+            seqs = sequences(D, rows, predict(model, fa_setup, FD, built[name], rows)[:, 0], tl_info)
             total = evaluate_all(seqs, thr, step_s, **kw)
-            fa_rows.append({"seed": s, "set": name, "setup": state["full"].label(), "hours": round(total.far_hours, 2),
+            fa_rows.append({"seed": s, "set": name, "setup": fa_setup.label(), "hours": round(total.far_hours, 2),
                             "false_alarms": total.n_false, "far_per_24h": total.far_per_24h})
     if FT is not None and "tusz" in steps:
         key = (state["full"].normalize, state["full"].context, False)
@@ -501,6 +537,9 @@ def main():
                      f"| {np.nanmean([r['clock_only_auroc'] for r in rs]):.3f} "
                      f"| {np.nanmean([r['sensitivity'] for r in rs]):.2f} | {np.nanmean([r['far_per_24h'] for r in rs]):.2f} |")
     lines += ["", "## False-alarm sets (setup chosen on all patients)", "",
+              (f"The setup chosen on all patients uses the time of day, which these recordings don't have, so they "
+               f"were scored with the same setup without it ({fa_setup.label()})." if clock_removed else
+               f"Setup: {fa_setup.label()}."), "",
               "| Seed | Set | Hours | False alarms | FAR / 24 h |", "|---|---|---|---|---|"]
     lines += [f"| {r['seed']} | {r['set']} | {r['hours']} | {r['false_alarms']} | {r['far_per_24h']:.2f} |" for r in fa_rows]
     (args.out / "d2_report.md").write_text("\n".join(lines) + "\n")

@@ -1,0 +1,3 @@
+seed,set,setup,hours,false_alarms,far_per_24h
+0,tusz (held-out half),norm=on ctx=0min clock=on tusz=off,557.15,0,0.0
+0,mental_arith,norm=on ctx=0min clock=on tusz=off,1.87,0,0.0

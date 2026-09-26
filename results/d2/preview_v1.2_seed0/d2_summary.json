@@ -1,0 +1,42 @@
+{
+  "seeds": [
+    0
+  ],
+  "steps": [
+    "normalize",
+    "context",
+    "clock",
+    "tusz"
+  ],
+  "per_seed": {
+    "0": {
+      "mean_auroc": 0.5999979581893531,
+      "mean_auroc_without_clock": 0.5052852891652673,
+      "mean_clock_only": 0.6965427145281404,
+      "sensitivity": 0.0990990990990991,
+      "far_per_24h": 5.093198457892689,
+      "time_in_warning": 0.1009305386627568,
+      "events": 111,
+      "predicted": 11,
+      "chance_probability": 0.10040764389390744,
+      "p_value": 0.5645279116510721
+    }
+  },
+  "mean_auroc": 0.5999979581893531,
+  "sd": 0.0,
+  "ci95": [
+    0.5274342203465572,
+    0.6778977803945244
+  ],
+  "d1_mean_auroc_same_seeds": 0.552587532343822,
+  "relative_improvement": 0.08579713270843792,
+  "wilcoxon_p": 0.19081425666809082,
+  "full_data_setup": "norm=on ctx=0min clock=on tusz=off",
+  "full_data_alarm": [
+    36,
+    1
+  ],
+  "dataset_identifiability_auroc": 0.8112230885139429,
+  "feature_version": "d1-v1-284c11e880",
+  "runtime_min": 105.69913640022278
+}

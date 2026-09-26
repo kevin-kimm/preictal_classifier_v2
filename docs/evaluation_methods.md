@@ -2,7 +2,7 @@
 
 | Doc | Version | Author | Written |
 |---|---|---|---|
-| EVM-001 | 1.2 | Kevin Kim | v1.0 on 2026-09-26, before any model was trained; v1.1 and v1.2 after D1, before any D2 result |
+| EVM-001 | 1.3 | Kevin Kim | v1.0 before any model was trained; v1.1 and v1.2 after D1, before any D2 result; v1.3 after a one-seed D2 preview (see Section 12) |
 
 This document fixes how models are trained, tuned and scored for Deliverables 1 and 2. It adds detail to the verification plan (tag `vtp-1.0`) and doesn't change any of its pass/fail criteria. It is committed before any model is trained so the Git history shows these choices came first. Anything changed after results are seen goes in the version history (Section 11) with a reason.
 
@@ -96,7 +96,11 @@ Candidates are tried one at a time, in this order. Each is kept only if it impro
 2. **Context length:** 0, 2, 5 or 10 min of preceding windows, summarized by the mean and slope of each feature over that time.
 3. **Time-of-day features (added in v1.1):** the sine and cosine of the clock time, which a live device would know. Part of the time-of-day effect may reflect when hospitals recorded rather than biology, so results are also reported without these features. TUSZ start times are anonymized, so if TUSZ is also kept (item 4), its windows get missing time features, and the dataset check in item 4 is repeated.
 4. **TUSZ interictal in training:** on or off, with each patient weighted equally. As a check, I'll also report how well a model can tell which dataset a window came from.
-5. **Model family:** gradient boosting (D1) or a small neural network on the per-channel features with the same channel pooling.
+5. **Model family:** gradient boosting (D1) or a small neural network on the per-channel features with the same channel pooling. The network is specified in advance and not tuned (v1.3):
+   * **Architecture.** Each derivation's 15 features pass through a shared layer (15→32, ReLU, 32→32, ReLU). The result is pooled over the derivations present by mean and max, and joined with the setup's other features (context and time of day), each with a flag for when it is missing. Then a layer of 64 (ReLU, dropout 0.2) leads to the 3 classes.
+   * **Training.** Weighted cross-entropy with the same sample weights as D1, AdamW (learning rate 0.001, weight decay 0.0001), batches of 1,024, 6 epochs, and seeded initialization and shuffling.
+   * **Normalization.** When normalization is on, the same causal 30 min rule is applied to each channel's features before pooling.
+   * **Implementation.** NumPy (`src/preictal/models/nn.py`), so runs are exactly reproducible; its gradients are checked numerically in `tests/test_nn.py`.
 6. **Alarm smoothing and persistence:** risk averaged over 1, 6, 12 or 36 windows, and required to stay above threshold for 1, 3 or 6 windows. Chosen to give the highest inner-validation sensitivity with at most 5 false alarms per 24 h.
 
 **How choices are made (v1.2).** Choices are made separately for each test patient's fold, which is stricter than choosing one setup from the average over all folds. An average over folds would include the test patient's own data, because every patient is an inner validation patient in some other folds.
@@ -104,7 +108,7 @@ Candidates are tried one at a time, in this order. Each is kept only if it impro
 * **Comparing candidates.** In each fold, every candidate is trained on that fold's training patients and scored on its inner validation patients (mean per-patient AUROC), averaged over the five seeds.
 * **Keeping a candidate.** A candidate is kept only if it beats the current setup; ties keep the current setup.
 * **Using the choice.** The setup chosen for a fold is used only for that fold's test patient. A setup is also chosen the same way on all patients (inner draw as in Section 9), for the false-alarm sets and the final model.
-* **Selection fits.** To keep run time reasonable, selection fits use every second window (10 s apart; overlapping windows are highly redundant). Final models use all windows.
+* **Selection fits.** To keep run time reasonable, selection fits use every third window (15 s apart; overlapping windows are highly redundant). This was every second window in v1.2, changed in v1.3 after the one-seed preview took 106 min. Final models use all windows.
 
 **Implementation details (v1.2).**
 
@@ -113,14 +117,29 @@ Candidates are tried one at a time, in this order. Each is kept only if it impro
 * **Time-of-day features.** Only CHB-MIT and Siena recordings placed on a timeline have real clock times. All other windows get missing time features.
 * **TUSZ patient split.** TUSZ patients are split in half with seed 0. Only half A can be used for training, with interictal windows taken 30 s apart. Half B is used only for false-alarm testing, so that test always stays on unseen patients.
 * **Alarm step.** Smoothing and persistence are chosen per fold by mean inner-validation sensitivity over the seeds, and the threshold is set per seed. The threshold search uses the same 1,000 candidates but a binary search, because it runs many more times than in D1. This assumes the false alarm rate doesn't rise with the threshold, which holds closely but not exactly with a refractory period.
-* **Model family (step 5).** The neural network is run after steps 1–4, once PyTorch is installed. If it is kept, the alarm step is repeated.
+* **False-alarm sets and the time of day (v1.3).** TUSZ and mental arithmetic have no real clock time. If the setup chosen on all patients uses time-of-day features, a model with the same setup minus those features is trained, with its own threshold and the same alarm smoothing and persistence, and that model is scored on these sets. Otherwise, a missing time can simply switch alarms off, as happened in the preview (0.00 false alarms per 24 h).
 
 D2 is compared with D1 on the same folds and seeds (VT-15), using D1's per-patient AUROC for the same seeds. As a robustness check, D2 is also evaluated without the seizures whose annotations were corrected or questioned (D1 findings F-06 and F-08).
 
-## 11. Version history
+## 11. Patient-specific test (added in v1.3)
+
+This test is a characterization. It doesn't replace or change VT-11 or VT-15, and it has no pass/fail threshold. It asks how well the same pipeline predicts seizures when it has seen the patient before, which is how a wearable would realistically be used.
+
+* **Patients.** CHB-MIT and Siena patients with at least two eligible seizures and at least 1 h of interictal EEG.
+* **Folds.** Leave one eligible seizure out at a time (`src/preictal/evaluation/patient_specific.py`).
+  * *Test:* that seizure's preictal windows, plus one of n equal chunks of the patient's interictal windows in time order, where n is the number of eligible seizures.
+  * *Training:* all other preictal, ictal and interictal windows of the same patient, except anything within 4 h of the held-out seizure's onset and anything within 5 min of the held-out interictal chunk.
+* **Model.** The D1 model and features, unchanged, with the D1 sample weights, and seeds 0 to 4.
+* **Metrics.**
+  * *Per patient:* AUROC over all of the patient's test windows pooled across folds, averaged over seeds.
+  * *Overall:* the mean over patients, with a 95% bootstrap interval.
+  * *Comparisons:* a patient-specific clock-only model trained on exactly the same windows, and the same patients' cross-patient D1 and D2 results.
+
+## 12. Version history
 
 | Version | Date | Change |
 |---|---|---|
 | 1.0 | 2026-09-26 | Written before any model was trained |
 | 1.1 | 2026-09-26 | After the D1 results and before any D2 work: added the clock-only reference baseline and time-of-day features, and moved per-patient normalization to first, based on D1 findings F-18 and F-19. Nothing about D1 changed |
 | 1.2 | 2026-09-26 | Before any D2 result: choices made per fold (nested) instead of averaged over folds; implementation details for normalization, context, time-of-day features, the TUSZ patient split and the alarm step; selection fits on every second window; binary threshold search in D2 |
+| 1.3 | 2026-09-26 | After a one-seed D2 preview (v1.2), which showed cross-patient EEG performance at chance without time-of-day features (0.505; 0.600 with them; clock-only 0.697) and 0.00 false alarms on the false-alarm sets because those recordings have no clock time. Added: the neural network specification (step 5 was already planned), the false-alarm scoring fix, selection fits on every third window, and the patient-specific test (Section 11). The step order and selection rules are unchanged. The preview itself is kept as a record and not reported as the D2 result |
