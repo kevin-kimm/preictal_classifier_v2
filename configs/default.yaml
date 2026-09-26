@@ -43,14 +43,36 @@ windows:
 
 alarm:
   refractory_min: 30    # (VTP) no new alarm for 30 min after an alarm
-  smoothing_windows: null
-  persistence_windows: null
+  smoothing_windows: 1  # D1: no smoothing (docs/evaluation_methods.md, Section 7)
+  persistence_windows: 1
+  threshold_candidates: 1000
+
+features:               # D1 baseline (docs/evaluation_methods.md, Section 5)
+  welch_segment_s: 2
+  bands_hz:
+    delta: [0.5, 4]
+    theta: [4, 8]
+    alpha: [8, 13]
+    beta: [13, 30]
+    gamma: [30, 45]
+  spectral_edge_fraction: 0.9
+  channel_pooling: [mean, std, min, max]
+
+model:
+  d1: hist_gradient_boosting   # scikit-learn defaults, random_state = seed
+  classes: [preictal, ictal, interictal]
+  weighting: class_balanced_equal_subjects
+
+training:
+  datasets: [chbmit, siena]              # D1; TUSZ interictal in training is a D2 experiment
+  false_alarm_sets: [tusz, mental_arith]
 
 evaluation:
   seeds: [0, 1, 2, 3, 4]              # (VTP) pre-registered; all are reported
   cv_scheme: lopo                     # (VTP) D-6: switches to grouped_10fold if more than 40 eligible test patients
   grouped_cv_patient_threshold: 40    # (VTP) decision D-6
   inner_validation_fraction: 0.2      # (VTP) training patients held out for thresholds
+  inner_validation_min_patients: 2
   bootstrap_resamples: 1000
   far_target_per_24h:
     d1: 10              # (VTP) proposed

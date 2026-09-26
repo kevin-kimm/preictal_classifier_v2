@@ -46,7 +46,7 @@ The datasets are not included in this repository. Each has its own data use term
 |---|---|---|---|---|---|
 | Siena Scalp EEG Database | 1.0.0 | Training and LOPO testing | 14 adults with epilepsy | 512 Hz | Referential |
 | CHB-MIT Scalp EEG Database | 1.0.0 | Training and LOPO testing | 24 cases from 23 subjects, mostly pediatric | 256 Hz | Bipolar |
-| TUH EEG Seizure Corpus (TUSZ) | 2.0.6 | Training and cross-patient testing; patients without seizures used for false alarm testing | 675 patients | Varies | Referential |
+| TUH EEG Seizure Corpus (TUSZ) | 2.0.6 | False alarm testing in D1 (no usable preictal data, see below); adding it to training is a D2 experiment | 675 patients | Varies | Referential |
 | TUH EEG Artifact Corpus (TUAR) | 3.0.1 | Artifact robustness testing | 213 patients | Varies | Referential |
 | EEG During Mental Arithmetic Tasks | 1.0.0 | False alarm testing in people without epilepsy | 36 healthy subjects | 500 Hz | Referential |
 
@@ -61,6 +61,8 @@ The counts below come from the data audit (verification test VT-01, [`results/d1
 | Mental arithmetic | 36 | 72 | 2.4 | 0 |
 
 In CHB-MIT, cases chb01 and chb21 come from the same person and are treated as one patient in cross-patient splits.
+
+TUSZ can't be used for prediction: its start times are anonymized and its files are at most 30 minutes long, so no TUSZ seizure has its 30-minute lead-up recorded (finding F-13 in the [D1 results](docs/verification_results/D1.md)). It is used for false alarm testing instead. After labeling, 25 patients can be test patients: 21 from CHB-MIT and 4 from Siena.
 
 ### Getting the data
 
@@ -136,8 +138,8 @@ pip install -e .
 | Stage | Code | Status |
 |---|---|---|
 | 1. Data audit | `scripts/audit_data.py` | Done (VT-01 passed) |
-| 2. Harmonization | `src/preictal/data/harmonize.py` | Planned |
-| 3. Relabeling | `src/preictal/data/labels.py` | Planned |
+| 2. Harmonization | `src/preictal/data/harmonize.py` | Done (VT-02 to VT-05 passed) |
+| 3. Relabeling | `src/preictal/data/labels.py` | Done (VT-06, VT-07 passed) |
 | 4. Model and LOPO training | `src/preictal/models/`, `src/preictal/evaluation/lopo.py` | Planned |
 | 5. Alarm logic | `src/preictal/alarm/alarm.py` | Planned |
 | 6. Replay and live interface | `src/preictal/ui/app.py`, `src/preictal/live/cyton.py` | Planned |
@@ -146,7 +148,7 @@ Tunable parameters, including the preictal window, sampling rate, alarm refracto
 
 ## Evaluation protocol
 
-Models are evaluated with cross-patient leave-one-patient-out (LOPO) validation: each patient is scored by a model that never saw any of their data. If the number of eligible patients makes LOPO impractical on a laptop, patient-grouped 10-fold cross-validation is used instead, under a rule fixed in advance (decision D-6 in the verification plan). Five random seeds are fixed in advance and all five are reported. Alarm thresholds are chosen on a validation subset of the training patients only, never on the test patient.
+Models are evaluated with cross-patient leave-one-patient-out (LOPO) validation over the 25 eligible test patients: each patient is scored by a model that never saw any of their data. D1 models are trained on CHB-MIT and Siena. The full setup, fixed before any model was trained, is in [`docs/evaluation_methods.md`](docs/evaluation_methods.md). If the number of eligible patients makes LOPO impractical on a laptop, patient-grouped 10-fold cross-validation is used instead, under a rule fixed in advance (decision D-6 in the verification plan). Five random seeds are fixed in advance and all five are reported. Alarm thresholds are chosen on a validation subset of the training patients only, never on the test patient.
 
 Window-level performance is measured by AUROC (preictal vs interictal) and a three-class confusion matrix. Event-level performance is measured by the fraction of seizures warned in time, false alarms per 24 hours, time spent in warning, and warning time, and is compared with a random predictor raising alarms at the same rate. Exact definitions and pass/fail criteria are in the [verification plan](docs/verification_plan.md).
 
@@ -154,7 +156,7 @@ Window-level performance is measured by AUROC (preictal vs interictal) and a thr
 
 | Deliverable | Verification report | Status |
 |---|---|---|
-| 1. Rebuild and first evaluation | [`docs/verification_results/D1.md`](docs/verification_results/D1.md) | In progress (VT-01 passed) |
+| 1. Rebuild and first evaluation | [`docs/verification_results/D1.md`](docs/verification_results/D1.md) | In progress (VT-01 to VT-07 passed) |
 | 2. Final prototype with alarm logic | `docs/verification_results/D2.md` | Not started |
 | 3. Interface and live Cyton test | `docs/verification_results/D3.md` | Not started |
 
@@ -184,9 +186,9 @@ A detailed comparison, including results, is part of the Deliverable 1 verificat
 
 | Deliverable | Item | Weight | Status |
 |---|---|---|---|
-| 1 (40%) | Evaluation methods: seeds, threshold derivation, alarm logic, relabeling | 10% | In progress |
-| 1 | Harmonized loader for Siena, CHB-MIT and TUSZ | 10% | Not started |
-| 1 | Relabeled corpus (30 min to 5 s before onset) | 5% | Not started |
+| 1 (40%) | Evaluation methods: seeds, threshold derivation, alarm logic, relabeling | 10% | Written ([evaluation_methods.md](docs/evaluation_methods.md)) |
+| 1 | Harmonized loader for Siena, CHB-MIT and TUSZ | 10% | Done |
+| 1 | Relabeled corpus (30 min to 5 s before onset) | 5% | Done |
 | 1 | Cross-patient LOPO classifier | 5% | Not started |
 | 1 | Verification test plan, written before testing | 5% | Done (frozen, tag `vtp-1.0`) |
 | 1 | Verification results against the plan | 5% | In progress |
@@ -202,7 +204,7 @@ A detailed comparison, including results, is part of the Deliverable 1 verificat
 
 ## Known limitations
 
-These are known before testing and will be revisited in the final analysis. Many TUSZ recordings are short clinical sessions, so a large share of TUSZ seizures may not have a full 30 min preictal period recorded. CHB-MIT is pediatric and recorded in a bipolar montage, which constrains the common representation for all datasets. Seizure onsets come from expert annotations, which carry their own uncertainty. The datasets were recorded with clinical equipment in hospital settings, which differs from a consumer headband. Live tests use seizure-free recordings, so they can measure false alarms but not whether seizures are predicted. The mental arithmetic recordings total only 2.4 h, which is too short to estimate a false alarm rate; they are used to check that task-related EEG changes don't trigger alarms.
+These are known before testing and will be revisited in the final analysis. TUSZ recordings are short and their start times anonymized, so no TUSZ seizure has a usable preictal period; TUSZ is used only for false alarm testing in D1. Only 25 patients (21 CHB-MIT, 4 Siena) can be test patients, so results rest on a small group dominated by children's recordings. CHB-MIT is pediatric and recorded in a bipolar montage, which constrains the common representation for all datasets. Seizure onsets come from expert annotations, which carry their own uncertainty. The datasets were recorded with clinical equipment in hospital settings, which differs from a consumer headband. Live tests use seizure-free recordings, so they can measure false alarms but not whether seizures are predicted. The mental arithmetic recordings total only 2.4 h, which is too short to estimate a false alarm rate; they are used to check that task-related EEG changes don't trigger alarms.
 
 ## Citations
 
