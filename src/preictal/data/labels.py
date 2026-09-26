@@ -20,11 +20,18 @@ Rules (defaults from configs/default.yaml):
                  to 4 h around seizures, ...)
 
 Timeline placement uses each EDF header's start time of day. Recordings are
-taken in file-name order; a recording that starts earlier in the day than the
-previous one ended (by more than an hour) is placed on the next day. This errs
-towards shorter gaps, which can only make fewer windows interictal. A recording
-without a readable start time can't be placed: it is labeled on its own, and
-none of its time is interictal if its patient (or TUSZ session) has seizures.
+taken in file-name order; a recording that starts more than an hour earlier in
+the day than the previous one ended is placed on the next day. This errs
+towards shorter gaps, which can only make fewer windows interictal.
+
+A recording can't be placed, and is labeled on its own, when:
+    * its header has no readable start time;
+    * every recording in its group reports the same start time (TUSZ headers are
+      anonymized to 00:00:00, so the gaps between its files are unknown);
+    * it would start more than 60 s before the previous recording ends, which
+      can't happen in a continuous recording, so its true position is unknown.
+None of an unplaced recording's time is interictal if its patient (or TUSZ
+session) has seizures, as decision D-5 requires.
 """
 
 from __future__ import annotations
@@ -42,7 +49,8 @@ from .loaders import Recording
 PREICTAL, ICTAL, INTERICTAL, EXCLUDED = 0, 1, 2, 3
 LABEL_NAMES = ("preictal", "ictal", "interictal", "excluded")
 DAY = 86400.0
-MAX_OVERLAP_S = 3600.0   # a start up to 1 h before the previous end is an overlap, not the next day
+MAX_OVERLAP_S = 3600.0        # a start more than 1 h before the previous end means the next day
+OVERLAP_TOLERANCE_S = 60.0    # overlaps up to 60 s are clock rounding; more means the position is unknown
 
 
 @dataclass(frozen=True)
@@ -134,12 +142,19 @@ def covered_length(a: float, b: float, spans: list[tuple[float, float]]) -> floa
 def place(recs: list[Recording], info: dict[str, tuple[float | None, float]],
           notes: list[str]) -> list[Placed]:
     """Put recordings on one timeline using their start time of day (see module docstring)."""
+    ordered = sorted(recs, key=lambda r: natural_key(r.path.name))
+    times = [info[r.rel_path][0] for r in ordered]
+    if len(ordered) > 1 and None not in times and len(set(times)) == 1:
+        notes.append(f"{ordered[0].rel_path.rsplit('/', 1)[0]}: all {len(ordered)} recordings report the "
+                     "same start time; start times treated as unknown")
+        times = [None] * len(ordered)
     placed, prev_end = [], None
-    for rec in sorted(recs, key=lambda r: natural_key(r.path.name)):
-        t0, duration = info[rec.rel_path]
+    for rec, t0 in zip(ordered, times):
+        duration = info[rec.rel_path][1]
         if t0 is None:
+            if info[rec.rel_path][0] is None:
+                notes.append(f"{rec.rel_path}: no readable start time; labeled on its own")
             placed.append(Placed(rec, 0.0, duration, anchored=False))
-            notes.append(f"{rec.rel_path}: no readable start time; labeled on its own")
             continue
         if prev_end is None:
             start = float(t0)
@@ -147,8 +162,11 @@ def place(recs: list[Recording], info: dict[str, tuple[float | None, float]],
             start = math.floor(prev_end / DAY) * DAY + t0
             if start < prev_end - MAX_OVERLAP_S:
                 start += DAY
-            if start < prev_end:
-                notes.append(f"{rec.rel_path}: overlaps the previous recording by {prev_end - start:.0f} s")
+            if start < prev_end - OVERLAP_TOLERANCE_S:
+                notes.append(f"{rec.rel_path}: would start {prev_end - start:.0f} s before the previous "
+                             "recording ends; position unknown, labeled on its own")
+                placed.append(Placed(rec, 0.0, duration, anchored=False))
+                continue
         placed.append(Placed(rec, start, duration))
         prev_end = start + duration if prev_end is None else max(prev_end, start + duration)
     return placed
@@ -205,9 +223,9 @@ def build_timelines(recs: list[Recording], rules: LabelRules | None = None,
         # unanchored recordings: labeled alone; no interictal if the group has seizures
         pieces += [(key + (p.rec.rel_path,), [p], not group_has_seizures)
                    for p in placed if not p.anchored]
-        for k, members, allow in pieces:
+        for i, (k, members, allow) in enumerate(pieces):
             tl = Timeline(k, ds, group[0].subject, role, members, allow_interictal=allow,
-                          notes=list(notes) if members is anchored else [])
+                          notes=list(notes) if i == 0 else [])   # group notes go on the first piece
             where = {}
             for p in members:
                 for on, off in p.rec.seizures:

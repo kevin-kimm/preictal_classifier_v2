@@ -132,12 +132,35 @@ def test_recording_after_midnight_goes_on_next_day():
     assert tl.events[0].eligible
 
 
-def test_small_overlap_is_not_pushed_to_next_day():
+def test_rounding_overlap_is_placed():
     a, b = rec("PN00-1.edf"), rec("PN00-2.edf")
-    info = {"PN00-1.edf": (10 * H, H), "PN00-2.edf": (10.5 * H, H)}
+    info = {"PN00-1.edf": (10 * H, H), "PN00-2.edf": (11 * H - 30, H)}      # 30 s overlap
     (tl,) = timelines([a, b], info)
-    assert tl.placed[1].start == 10.5 * H
-    assert any("overlaps" in n for n in tl.notes)
+    assert tl.placed[1].start == 11 * H - 30 and tl.placed[1].anchored
+
+
+def test_large_overlap_is_labeled_alone():
+    a = rec("PN00-1.edf", seizures=[(600, 660)])
+    b = rec("PN00-2.edf")
+    info = {"PN00-1.edf": (10 * H, H), "PN00-2.edf": (10.5 * H, 10 * H)}    # 30 min overlap
+    tls = timelines([a, b], info)
+    alone = next(t for t in tls if any(p.rec is b for p in t.placed))
+    assert not alone.placed[0].anchored and not alone.allow_interictal
+    assert any("position unknown" in n for t in tls for n in t.notes)
+
+
+def test_identical_start_times_are_treated_as_unknown():
+    # TUSZ headers are anonymized to 00:00:00, so the files of a session can't be ordered in time
+    t0 = rec("aaaaaaac_s001_t000.edf", dataset="tusz", patient="aaaaaaac")
+    t1 = rec("aaaaaaac_s001_t001.edf", seizures=[(1500, 1560)], dataset="tusz", patient="aaaaaaac")
+    tls = timelines([t0, t1], {t0.rel_path: (0, 1800), t1.rel_path: (0, 1800)})
+    assert len(tls) == 2 and not any(p.anchored for t in tls for p in t.placed)
+    seizure_tl = next(t for t in tls if t.events)
+    assert seizure_tl.events[0].coverage == pytest.approx(1495 / 1795)   # only its own file counts
+    assert not seizure_tl.events[0].eligible                              # 83% < 90%
+    other = next(t for t in tls if not t.events)
+    assert not other.allow_interictal                        # same session has a seizure (D-5)
+    assert any("same start time" in n for t in tls for n in t.notes)
 
 
 def test_neighbouring_file_seizure_blocks_interictal():

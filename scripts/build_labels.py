@@ -210,18 +210,23 @@ def main():
     for ds in PREDICTION_DATASETS:
         lines.append(f"| {ds} | {coverage_buckets[(ds, 'none recorded')]} | {coverage_buckets[(ds, 'under 50%')]} "
                      f"| {coverage_buckets[(ds, '50-90%')]} |")
+    same_time = Counter(n.split("/")[0].rsplit("_v", 1)[0] for n in timeline_notes if "same start time" in n)
+    uncertain = [n for n in timeline_notes if "position unknown" in n]
     lines += ["", "## Timelines", "",
-              f"Recordings without a readable start time (labeled alone): "
+              "Recordings are placed in time using their EDF start times. A recording is labeled on its own "
+              "when its position can't be trusted; none of its time is then interictal if its patient "
+              "(or TUSZ session) has seizures.", "",
+              "Recordings labeled on their own: "
               + (", ".join(f"{k} {v}" for k, v in sorted(unanchored.items())) or "none") + ".",
-              f"Timelines spanning more than one day: "
-              + (", ".join(f"{k} {v}" for k, v in sorted(multi_day.items())) or "none") + ".",
-              f"Recordings that overlap the previous one on their timeline: "
-              f"{sum('overlaps' in n for n in timeline_notes)}."]
-    overlaps = [n for n in timeline_notes if "overlaps" in n]
-    if overlaps:
-        lines += [""] + [f"- {n}" for n in overlaps[:30]]
-        if len(overlaps) > 30:
-            lines.append(f"- ... and {len(overlaps) - 30} more")
+              "Groups (patients or TUSZ sessions) whose recordings all report the same start time: "
+              + (", ".join(f"{k} {v}" for k, v in sorted(same_time.items())) or "none") + ".",
+              f"Recordings that would start more than 60 s before the previous one ends: {len(uncertain)}.",
+              "Timelines spanning more than one day: "
+              + (", ".join(f"{k} {v}" for k, v in sorted(multi_day.items())) or "none") + "."]
+    if uncertain:
+        lines += [""] + [f"- {n}" for n in uncertain[:30]]
+        if len(uncertain) > 30:
+            lines.append(f"- ... and {len(uncertain) - 30} more")
     for label, items in (("Label interval mismatches", bad_intervals), ("Window coverage mismatches", bad_windows)):
         if items:
             lines += ["", f"{label}:", ""] + [f"- {x}" for x in items[:30]]
