@@ -1,0 +1,84 @@
+{
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "per_seed": {
+    "0": {
+      "mean_patient_auroc": 0.552587532343822,
+      "pooled_auroc": 0.49857950146091295,
+      "macro_f1_pooled": 0.2993353901636581,
+      "sensitivity": 0.22522522522522523,
+      "far_per_24h": 9.931736992890745,
+      "time_in_warning": 0.2047768206734534,
+      "events": 111,
+      "predicted": 25,
+      "chance_probability": 0.18644067882510829,
+      "chance_p_value": 0.17578590694837598,
+      "median_warning_s": 718.0
+    },
+    "1": {
+      "mean_patient_auroc": 0.5541245920837233,
+      "pooled_auroc": 0.5036977549037315,
+      "macro_f1_pooled": 0.3072068626808933,
+      "sensitivity": 0.18018018018018017,
+      "far_per_24h": 8.964029285891133,
+      "time_in_warning": 0.181702183197543,
+      "events": 111,
+      "predicted": 20,
+      "chance_probability": 0.1699188886332289,
+      "chance_p_value": 0.42522724280543717,
+      "median_warning_s": 937.0
+    },
+    "2": {
+      "mean_patient_auroc": 0.5642397252970186,
+      "pooled_auroc": 0.5317713524131525,
+      "macro_f1_pooled": 0.30900953973380096,
+      "sensitivity": 0.23423423423423423,
+      "far_per_24h": 12.223676298942454,
+      "time_in_warning": 0.2431979873040204,
+      "events": 111,
+      "predicted": 26,
+      "chance_probability": 0.22427137826321297,
+      "chance_p_value": 0.43708987566946533,
+      "median_warning_s": 1004.0
+    },
+    "3": {
+      "mean_patient_auroc": 0.5454634883059504,
+      "pooled_auroc": 0.5023477865359041,
+      "macro_f1_pooled": 0.30882904368910785,
+      "sensitivity": 0.21621621621621623,
+      "far_per_24h": 10.772114738443038,
+      "time_in_warning": 0.21649810893217147,
+      "events": 111,
+      "predicted": 24,
+      "chance_probability": 0.20052152550673108,
+      "chance_p_value": 0.3760470416220138,
+      "median_warning_s": 1091.5
+    },
+    "4": {
+      "mean_patient_auroc": 0.5636018201161825,
+      "pooled_auroc": 0.5227742140833341,
+      "macro_f1_pooled": 0.30804443707732493,
+      "sensitivity": 0.18018018018018017,
+      "far_per_24h": 11.15410462278499,
+      "time_in_warning": 0.22189778792271336,
+      "events": 111,
+      "predicted": 20,
+      "chance_probability": 0.20684109077203772,
+      "chance_p_value": 0.7889326500872806,
+      "median_warning_s": 1009.0
+    }
+  },
+  "mean_patient_auroc": 0.5560034316293393,
+  "sd_across_seeds": 0.007097335446552672,
+  "ci95": [
+    0.5015823276166392,
+    0.6155791420480881
+  ],
+  "mean_far_per_24h": 10.609132387790472,
+  "feature_version": "d1-v1-284c11e880"
+}

@@ -1,0 +1,9 @@
+{
+  "seed": 0,
+  "fold": 0,
+  "subject": "chbmit:chb01",
+  "auroc_run1": 0.5187696916014645,
+  "auroc_run2": 0.5187696916014645,
+  "difference": 0.0,
+  "pass": true
+}
