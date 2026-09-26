@@ -36,8 +36,10 @@ labels:
   tusz_no_seizure_patients: false_alarm_only   # (VTP) decision D-5
 
 windows:
-  length_s: null        # set during Deliverable 1 development, before testing
-  step_s: null
+  length_s: 30          # EEG in each window; labels come from the window's end time
+  step_s: 5             # a new window (and risk score) every 5 s
+  context_candidates_min: [0, 2, 5, 10]   # D2: minutes of preceding windows the model sees;
+                                          # chosen by inner validation on training patients only
 
 alarm:
   refractory_min: 30    # (VTP) no new alarm for 30 min after an alarm
