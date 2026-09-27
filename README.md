@@ -4,7 +4,7 @@ Cross-patient seizure forecasting from scalp EEG. The software watches a continu
 
 > **Research prototype.** This software is not a medical device, has not been clinically validated, and must not be used to make medical decisions.
 
-**Status:** Deliverable 1 in progress · **Author:** Kevin Kim · **Predecessor:** [preictal_classifier (AuraSense v1)](https://github.com/kevin-kimm/preictal_classifier)
+**Status:** Deliverable 2 in progress · **Author:** Kevin Kim · **Predecessor:** [preictal_classifier (AuraSense v1)](https://github.com/kevin-kimm/preictal_classifier)
 
 ## Overview
 
@@ -157,21 +157,22 @@ Window-level performance is measured by AUROC (preictal vs interictal) and a thr
 | Deliverable | Verification report | Status |
 |---|---|---|
 | 1. Rebuild and first evaluation | [`docs/verification_results/D1.md`](docs/verification_results/D1.md) | VT-01 to VT-13 run (VT-13 failed); VT-14 remaining |
-| 2. Final prototype with alarm logic | `docs/verification_results/D2.md` | Not started |
+| 2. Final prototype with alarm logic | [`docs/verification_results/D2.md`](docs/verification_results/D2.md) | VT-15 and VT-17 failed, VT-16 passed; patient-specific test reported |
 | 3. Interface and live Cyton test | `docs/verification_results/D3.md` | Not started |
 
 ### Current model metrics
 
 | Metric | D1 | D2 | D3 (live) |
 |---|---|---|---|
-| Mean LOPO AUROC (± SD across seeds) | 0.556 ± 0.007 (95% CI 0.502–0.616) | – | – |
-| Clock-only baseline AUROC | 0.697 (seed 0) | – | Not applicable |
-| Event sensitivity | 0.21 (chance at this rate: 0.20) | – | Not applicable |
-| False alarms per 24 h, test patients | 10.61 | – | – |
-| False alarms per 24 h, TUSZ (unseen patients) | 69.67 | – | – |
-| Time in warning, median warning time | see [`lopo_report.md`](results/d1/lopo_report.md) | – | Not applicable |
+| Mean LOPO AUROC (± SD across seeds) | 0.556 ± 0.007 (95% CI 0.502–0.616) | 0.614 ± 0.007 (0.528 without time of day) | – |
+| Clock-only baseline AUROC | 0.697 (seed 0) | 0.691 | Not applicable |
+| Patient-specific AUROC (22 patients, EEG only) | – | 0.662 (95% CI 0.588–0.742) | Not applicable |
+| Event sensitivity | 0.21 (chance at this rate: 0.20) | 0.16 (chance: 0.11) | Not applicable |
+| False alarms per 24 h, test patients | 10.61 | 5.84 | – |
+| False alarms per 24 h, TUSZ (unseen patients) | 69.67 | 55.2 (held-out half) | – |
+| Time in warning, median warning time | see [`lopo_report.md`](results/d1/lopo_report.md) | see [`d2_report.md`](results/d2/d2_report.md) | Not applicable |
 
-D1 is a deliberately simple, untuned baseline. It detects seizures well (AUROC 0.865 for windows inside a seizure) but predicts them only slightly better than chance, and a model that knows only the time of day does better (see findings F-18 to F-23 in the [D1 results](docs/verification_results/D1.md)).
+D1 is a deliberately simple, untuned baseline. It detects seizures well (AUROC 0.865 for windows inside a seizure) but predicts them only slightly better than chance, and a model that knows only the time of day does better (see findings F-18 to F-23 in the [D1 results](docs/verification_results/D1.md)). D2 tried normalization, context, time of day, TUSZ data and a neural network, chosen per patient by nested cross-validation. Its gain over D1 came entirely from the time of day, and its alarms stayed near chance. Trained on the same person's other seizures, though, the D1 model reaches 0.662 from EEG alone, which points to a personalized design (findings F2-01 to F2-05 in the [D2 results](docs/verification_results/D2.md)).
 
 ## Comparison with v1
 
@@ -196,10 +197,10 @@ A detailed comparison, including results, is part of the Deliverable 1 verificat
 | 1 | Verification test plan, written before testing | 5% | Done (frozen, tag `vtp-1.0`) |
 | 1 | Verification results against the plan | 5% | VT-01 to VT-13 done |
 | 1 | Detailed comparison with v1 | – | Not started |
-| 2 (40%) | Classifier improved by at least 15% over D1 | 10% | Not started |
-| 2 | Alarm generation logic | 5% | Not started |
-| 2 | Event sensitivity and false alarm targets | – | Not started |
-| 2 | Final analysis of results | 10% | Not started |
+| 2 (40%) | Classifier improved by at least 15% over D1 | 10% | Not met: +10.5%, all from the time of day |
+| 2 | Alarm generation logic | 5% | Done (VT-16 passed) |
+| 2 | Event sensitivity and false alarm targets | – | Not met: 16% warned at 5.84 false alarms per 24 h |
+| 2 | Final analysis of results | 10% | In progress |
 | 2 | README | 15% | In progress |
 | 3 (20%) | Local interface showing dataset replay and alarms | 10% | Not started |
 | 3 | Real-time Cyton acquisition, live baseline, seizure-free recording | – | Not started |
