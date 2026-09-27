@@ -41,3 +41,24 @@ def patient_folds(times: np.ndarray, labels: np.ndarray, timelines: np.ndarray,
         train = np.flatnonzero(trainable & ~excluded)
         test = np.concatenate([pre, chunk])
         yield i, train, test
+
+
+def inner_interictal_folds(times: np.ndarray, labels: np.ndarray, timelines: np.ndarray,
+                           train: np.ndarray, k: int = 3, gap_s: float = 300.0):
+    """Split an outer training set for choosing an alarm threshold (evaluation methods v1.5).
+
+    The training set's interictal windows are split into k chunks in time order. Each
+    chunk is held out in turn, with everything within gap_s of it removed from that
+    inner training set. Yields (inner training indices, held-out interictal chunk).
+    """
+    inter = train[labels[train] == INTERICTAL]
+    inter = inter[np.lexsort((times[inter], timelines[inter]))]
+    for chunk in np.array_split(inter, k):
+        if len(chunk) == 0:
+            continue
+        near = np.zeros(len(times), dtype=bool)
+        for code in np.unique(timelines[chunk]):
+            t = times[chunk][timelines[chunk] == code]
+            near |= (timelines == code) & (times >= t.min() - gap_s) & (times <= t.max() + gap_s)
+        yield train[~near[train]], chunk
+

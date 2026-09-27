@@ -2,7 +2,7 @@
 
 | Doc | Version | Author | Written |
 |---|---|---|---|
-| EVM-001 | 1.4 | Kevin Kim | v1.0 before any model was trained; v1.1 and v1.2 after D1, before any D2 result; v1.3 after a one-seed D2 preview; v1.4 after the full D2 run (see Section 12) |
+| EVM-001 | 1.5 | Kevin Kim | v1.0 before any model was trained; v1.1 and v1.2 after D1, before any D2 result; v1.3 after a one-seed D2 preview; v1.4 after the full D2 run; v1.5 after the personalized variants (see Section 12) |
 
 This document fixes how models are trained, tuned and scored for Deliverables 1 and 2. It adds detail to the verification plan (tag `vtp-1.0`) and doesn't change any of its pass/fail criteria. It is committed before any model is trained so the Git history shows these choices came first. Anything changed after results are seen goes in the version history (Section 11) with a reason.
 
@@ -148,6 +148,20 @@ Other patients' windows are taken 30 s apart (non-overlapping) to keep the run t
 
 Two risks are stated in advance. With only a few seizures per patient, a patient-only model may learn the clock times of the training seizures rather than a daily pattern, so the time-of-day variants could do worse, not better. And a model trained partly on other patients may lean on the time-of-day pattern that works across patients.
 
+### 11.2 Alarm-level test of the personalized designs (added in v1.5)
+
+This is a characterization, with no pass/fail threshold. It measures what share of seizures the personalized designs would warn about, and how many false alarms they would raise, when the alarm threshold is chosen from each patient's training data only (`scripts/run_personalized_alarms.py`). It uses the same patients, folds, buffers and seeds as Sections 11 and 11.1.
+
+* **Variants:**
+  * other patients only, EEG + time of day;
+  * other patients + this patient, EEG + time of day;
+  * this patient only, EEG + 10 min context + time of day.
+* **Threshold.** Within each fold, the training data's interictal windows are split into 3 chunks in time order. Each chunk is scored by a model trained on the rest of the fold's training data, excluding anything within 5 min of the chunk. For the other-patients-only model, which never sees this patient, the training windows are simply scored. The threshold is the lowest of 1,000 candidates, found by binary search, whose false alarm rate on these out-of-sample scores is at most the target. The targets are 5 per 24 h (the D2 target) and 1 per 24 h.
+* **Alarm settings.** Fixed to the D2 settings chosen on all patients: risk averaged over 36 windows, above threshold for 6 windows in a row, and a 30 min refractory period.
+* **Warned seizures.** The held-out seizure's timeline is scored from 35 min to 5 s before onset, which gives smoothing 5 min to warm up. The seizure counts as warned if an alarm falls 5 s to 30 min before onset.
+* **False alarms.** Every alarm on the held-out interictal chunk is a false alarm, and the rate is false alarms over that chunk's hours.
+* **Reporting.** Sensitivity, false alarms per 24 h and the chance comparison are pooled over patients for each seed and averaged over seeds. The report also gives the number of patients with at least one seizure warned, and per-patient results.
+
 ## 12. Version history
 
 | Version | Date | Change |
@@ -157,3 +171,4 @@ Two risks are stated in advance. With only a few seizures per patient, a patient
 | 1.2 | 2026-09-26 | Before any D2 result: choices made per fold (nested) instead of averaged over folds; implementation details for normalization, context, time-of-day features, the TUSZ patient split and the alarm step; selection fits on every second window; binary threshold search in D2 |
 | 1.3 | 2026-09-26 | After a one-seed D2 preview (v1.2), which showed cross-patient EEG performance at chance without time-of-day features (0.505; 0.600 with them; clock-only 0.697) and 0.00 false alarms on the false-alarm sets because those recordings have no clock time. Added: the neural network specification (step 5 was already planned), the false-alarm scoring fix, selection fits on every third window, and the patient-specific test (Section 11). The step order and selection rules are unchanged. The preview itself is kept as a record and not reported as the D2 result |
 | 1.4 | 2026-09-27 | After the full D2 run (VT-15 and VT-17 failed; the patient-specific test gave 0.662): added the personalized variants (Section 11.1), before running them. Nothing about D1, D2 or the patient-specific test changed |
+| 1.5 | 2026-09-27 | After the personalized variants (best: other patients + this patient, AUROC 0.698): added the alarm-level test of the personalized designs (Section 11.2), before running it |

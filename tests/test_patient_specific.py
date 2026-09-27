@@ -69,3 +69,19 @@ def test_blend_weights_give_the_person_half_of_each_class():
     for c in (PREICTAL, ICTAL, INTERICTAL):
         share = wp[yp == c].sum() / (wp[yp == c].sum() + wg[yg == c].sum())
         assert abs(share - 0.5) < 1e-9
+
+
+def test_inner_interictal_folds_hold_out_each_chunk_with_a_gap():
+    from preictal.evaluation.patient_specific import inner_interictal_folds
+    onsets = [10 * H, 30 * H, 44 * H]
+    t, lab, tl = timeline(onsets, hours=60)
+    _, train, _ = next(iter(patient_folds(t, lab, tl, [(0, o) for o in onsets])))
+    held = []
+    for inner_train, chunk in inner_interictal_folds(t, lab, tl, train, k=3):
+        assert set(chunk) <= set(train) and np.all(lab[chunk] == INTERICTAL)
+        assert not set(inner_train) & set(chunk)
+        lo, hi = t[chunk].min(), t[chunk].max()
+        assert not np.any((t[inner_train] >= lo - 300) & (t[inner_train] <= hi + 300))
+        assert (lab[inner_train] == PREICTAL).any()
+        held += list(chunk)
+    assert sorted(held) == sorted(train[lab[train] == INTERICTAL])
