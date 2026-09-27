@@ -1,0 +1,95 @@
+{
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "steps": [
+    "normalize",
+    "context",
+    "clock",
+    "tusz",
+    "model"
+  ],
+  "per_seed": {
+    "0": {
+      "mean_auroc": 0.6051006130943887,
+      "mean_auroc_without_clock": 0.513496780530604,
+      "mean_clock_only": 0.6965427145281404,
+      "sensitivity": 0.16216216216216217,
+      "far_per_24h": 5.32239238849786,
+      "time_in_warning": 0.10984577106138611,
+      "events": 111,
+      "predicted": 18,
+      "chance_probability": 0.10468096983774577,
+      "p_value": 0.04020909507288086
+    },
+    "1": {
+      "mean_auroc": 0.6221748646639181,
+      "mean_auroc_without_clock": 0.5140306875690076,
+      "mean_clock_only": 0.7008839116539994,
+      "sensitivity": 0.13513513513513514,
+      "far_per_24h": 5.704382272839812,
+      "time_in_warning": 0.11508022459554475,
+      "events": 111,
+      "predicted": 15,
+      "chance_probability": 0.1117581172843578,
+      "p_value": 0.2563708869620993
+    },
+    "2": {
+      "mean_auroc": 0.6085036623003259,
+      "mean_auroc_without_clock": 0.5422607407150418,
+      "mean_clock_only": 0.6859597185721542,
+      "sensitivity": 0.15315315315315314,
+      "far_per_24h": 6.442896049234252,
+      "time_in_warning": 0.12986859716645285,
+      "events": 111,
+      "predicted": 17,
+      "chance_probability": 0.12528236559800032,
+      "p_value": 0.22362772162854844
+    },
+    "3": {
+      "mean_auroc": 0.6153403536537594,
+      "mean_auroc_without_clock": 0.5283416677917765,
+      "mean_clock_only": 0.6889723149073221,
+      "sensitivity": 0.1981981981981982,
+      "far_per_24h": 5.7298482651292755,
+      "time_in_warning": 0.11895399790066478,
+      "events": 111,
+      "predicted": 22,
+      "chance_probability": 0.1122279331518381,
+      "p_value": 0.005673451426643655
+    },
+    "4": {
+      "mean_auroc": 0.6204755322454822,
+      "mean_auroc_without_clock": 0.542605084167314,
+      "mean_clock_only": 0.6808421611589001,
+      "sensitivity": 0.15315315315315314,
+      "far_per_24h": 6.009974180313374,
+      "time_in_warning": 0.12131019621564282,
+      "events": 111,
+      "predicted": 17,
+      "chance_probability": 0.11737953566215376,
+      "p_value": 0.15291630803345269
+    }
+  },
+  "mean_auroc": 0.6143190051915749,
+  "sd": 0.006625065613202181,
+  "ci95": [
+    0.5286375131110084,
+    0.7022468174075082
+  ],
+  "d1_mean_auroc_same_seeds": 0.5560034316293394,
+  "relative_improvement": 0.10488347777161142,
+  "wilcoxon_p": 0.12664812803268433,
+  "full_data_setup": "norm=off ctx=0min clock=on tusz=off model=hgb",
+  "full_data_alarm": [
+    36,
+    6
+  ],
+  "dataset_identifiability_auroc": 0.958619148463892,
+  "feature_version": "d1-v1-284c11e880",
+  "runtime_min": 380.6630546132723
+}

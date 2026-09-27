@@ -1,0 +1,11 @@
+seed,set,setup,hours,false_alarms,far_per_24h
+0,tusz (held-out half),norm=off ctx=0min clock=off tusz=off model=hgb,557.15,1154,49.710379761981066
+0,mental_arith,norm=off ctx=0min clock=off tusz=off model=hgb,1.87,0,0.0
+1,tusz (held-out half),norm=off ctx=0min clock=off tusz=off model=hgb,557.15,1378,59.3595349324176
+1,mental_arith,norm=off ctx=0min clock=off tusz=off model=hgb,1.87,4,51.314031180400896
+2,tusz (held-out half),norm=off ctx=0min clock=off tusz=off model=hgb,557.15,1332,57.378011995631525
+2,mental_arith,norm=off ctx=0min clock=off tusz=off model=hgb,1.87,2,25.657015590200448
+3,tusz (held-out half),norm=off ctx=0min clock=off tusz=off model=hgb,557.15,1134,48.84884805033495
+3,mental_arith,norm=off ctx=0min clock=off tusz=off model=hgb,1.87,1,12.828507795100224
+4,tusz (held-out half),norm=off ctx=0min clock=off tusz=off model=hgb,557.15,1406,60.56567932872217
+4,mental_arith,norm=off ctx=0min clock=off tusz=off model=hgb,1.87,2,25.657015590200448
