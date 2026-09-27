@@ -57,3 +57,15 @@ def test_other_timelines_are_not_excluded():
     (_, train, test), _ = list(patient_folds(t, lab, tl, [(0, 10 * H), (1, 12 * H)]))
     # the second timeline's seizure (same clock time range) is still available for training
     assert ((tl[train] == 1) & (lab[train] == PREICTAL)).any()
+
+
+def test_blend_weights_give_the_person_half_of_each_class():
+    from preictal.models.train import blend_weights
+    rng = np.random.default_rng(0)
+    yg = rng.choice([PREICTAL, ICTAL, INTERICTAL], size=5000, p=[0.1, 0.02, 0.88])
+    sg = rng.integers(0, 20, 5000)
+    yp = rng.choice([PREICTAL, ICTAL, INTERICTAL], size=300, p=[0.2, 0.05, 0.75])
+    wg, wp = blend_weights(yg, sg, yp, personal_share=0.5)
+    for c in (PREICTAL, ICTAL, INTERICTAL):
+        share = wp[yp == c].sum() / (wp[yp == c].sum() + wg[yg == c].sum())
+        assert abs(share - 0.5) < 1e-9

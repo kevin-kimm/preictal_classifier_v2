@@ -57,7 +57,7 @@ from preictal.evaluation.metrics import (  # noqa: E402
 )
 from preictal.features.build_features import feature_version  # noqa: E402
 from preictal.features.transforms import (  # noqa: E402
-    clock_features, context_features, rolling_normalize, timeline_has_clock,
+    cache_key, clock_features, context_features, rolling_normalize, timeline_has_clock,
 )
 from preictal.models.model import build_model, predict_proba  # noqa: E402
 from preictal.models.nn import DeepSetsClassifier  # noqa: E402
@@ -104,7 +104,7 @@ class FeatureSet:
         self.norm = self._cached("norm", lambda: rolling_normalize(W.X, W.timeline, W.t_end))
 
     def _cached(self, tag, compute):
-        path = self.cache_dir / f"{self.name}_{tag}_{self.version}.npy"
+        path = self.cache_dir / f"{self.name}_{tag}_{self.version}_{cache_key(self.W)}.npy"
         if not path.exists():
             print(f"  computing {self.name} {tag} features (one-off, cached)...")
             self.cache_dir.mkdir(parents=True, exist_ok=True)

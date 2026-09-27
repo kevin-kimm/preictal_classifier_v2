@@ -99,3 +99,21 @@ def fit(X: np.ndarray, y: np.ndarray, subject: np.ndarray, seed: int):
     model = build_model(seed)
     model.fit(X[keep], y[keep], sample_weight=sample_weights(y[keep], subject[keep]))
     return model
+
+
+def blend_weights(y_general: np.ndarray, subject_general: np.ndarray, y_personal: np.ndarray,
+                  personal_share: float = 0.5) -> tuple[np.ndarray, np.ndarray]:
+    """Weights for a general model adapted to one person (evaluation methods v1.4).
+
+    Other patients are weighted as in D1 (each class equal, each patient equal
+    within a class). The person's own windows are then scaled so that, within each
+    class, they carry personal_share of the total weight.
+    """
+    wg = sample_weights(y_general, subject_general)
+    wp = sample_weights(y_personal, np.zeros(len(y_personal), dtype=int)) if len(y_personal) else np.zeros(0)
+    for c in TRAIN_CLASSES:
+        g, p = y_general == c, y_personal == c
+        if g.any() and p.any():
+            wp[p] *= (personal_share / (1 - personal_share)) * wg[g].sum() / wp[p].sum()
+    return wg, wp
+

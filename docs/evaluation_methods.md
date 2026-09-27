@@ -2,7 +2,7 @@
 
 | Doc | Version | Author | Written |
 |---|---|---|---|
-| EVM-001 | 1.3 | Kevin Kim | v1.0 before any model was trained; v1.1 and v1.2 after D1, before any D2 result; v1.3 after a one-seed D2 preview (see Section 12) |
+| EVM-001 | 1.4 | Kevin Kim | v1.0 before any model was trained; v1.1 and v1.2 after D1, before any D2 result; v1.3 after a one-seed D2 preview; v1.4 after the full D2 run (see Section 12) |
 
 This document fixes how models are trained, tuned and scored for Deliverables 1 and 2. It adds detail to the verification plan (tag `vtp-1.0`) and doesn't change any of its pass/fail criteria. It is committed before any model is trained so the Git history shows these choices came first. Anything changed after results are seen goes in the version history (Section 11) with a reason.
 
@@ -135,6 +135,19 @@ This test is a characterization. It doesn't replace or change VT-11 or VT-15, an
   * *Overall:* the mean over patients, with a 95% bootstrap interval.
   * *Comparisons:* a patient-specific clock-only model trained on exactly the same windows, and the same patients' cross-patient D1 and D2 results.
 
+### 11.1 Personalized variants (added in v1.4)
+
+This is also a characterization, with no pass/fail threshold. It uses the same 22 patients, the same folds and buffers, and seeds 0 to 4, so every variant is scored on exactly the same test windows as the patient-specific test. Settings are fixed in advance and not tuned (`scripts/run_personalized.py`):
+
+* **This patient only, EEG + time of day:** the D1 features plus the sine and cosine of the time of day.
+* **This patient only, EEG + 10 min context + time of day:** as above, plus the 10 min context of the D1 features (mean and slope). 10 min was the context length D2 chose most often.
+* **Other patients only, EEG + time of day:** trained on every other CHB-MIT and Siena patient, never on this one; this is D2's setup chosen on all patients. It is trained once per patient and seed, and scored on each fold's test windows.
+* **Other patients + this patient, EEG + time of day:** the same, plus this patient's training windows for the fold. Within each class, the patient's own windows carry half of the total weight, and the other patients share the other half as in D1.
+
+Other patients' windows are taken 30 s apart (non-overlapping) to keep the run time reasonable; the patient's own windows are all used. Results are reported as the mean per-patient AUROC with a 95% bootstrap interval. They are compared with the patient-specific EEG and clock-only results, using paired Wilcoxon tests and the number of patients where each variant is higher.
+
+Two risks are stated in advance. With only a few seizures per patient, a patient-only model may learn the clock times of the training seizures rather than a daily pattern, so the time-of-day variants could do worse, not better. And a model trained partly on other patients may lean on the time-of-day pattern that works across patients.
+
 ## 12. Version history
 
 | Version | Date | Change |
@@ -143,3 +156,4 @@ This test is a characterization. It doesn't replace or change VT-11 or VT-15, an
 | 1.1 | 2026-09-26 | After the D1 results and before any D2 work: added the clock-only reference baseline and time-of-day features, and moved per-patient normalization to first, based on D1 findings F-18 and F-19. Nothing about D1 changed |
 | 1.2 | 2026-09-26 | Before any D2 result: choices made per fold (nested) instead of averaged over folds; implementation details for normalization, context, time-of-day features, the TUSZ patient split and the alarm step; selection fits on every second window; binary threshold search in D2 |
 | 1.3 | 2026-09-26 | After a one-seed D2 preview (v1.2), which showed cross-patient EEG performance at chance without time-of-day features (0.505; 0.600 with them; clock-only 0.697) and 0.00 false alarms on the false-alarm sets because those recordings have no clock time. Added: the neural network specification (step 5 was already planned), the false-alarm scoring fix, selection fits on every third window, and the patient-specific test (Section 11). The step order and selection rules are unchanged. The preview itself is kept as a record and not reported as the D2 result |
+| 1.4 | 2026-09-27 | After the full D2 run (VT-15 and VT-17 failed; the patient-specific test gave 0.662): added the personalized variants (Section 11.1), before running them. Nothing about D1, D2 or the patient-specific test changed |

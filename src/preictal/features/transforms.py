@@ -15,6 +15,8 @@ clock       sine and cosine of the time of day. Only CHB-MIT and Siena recording
 
 from __future__ import annotations
 
+import hashlib
+
 import numpy as np
 import pandas as pd
 
@@ -90,3 +92,10 @@ def timeline_has_clock(timeline_key: str) -> bool:
     """
     parts = timeline_key.split("|")
     return parts[0] in ("chbmit", "siena") and len(parts) == 2
+
+
+def cache_key(W) -> str:
+    """Identifies a set of loaded windows, so cached transforms are never reused for different data."""
+    h = hashlib.md5(np.ascontiguousarray(W.t_end).tobytes() + np.ascontiguousarray(W.timeline).tobytes())
+    return f"{len(W.y)}_{h.hexdigest()[:8]}"
+
