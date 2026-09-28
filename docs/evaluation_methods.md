@@ -2,7 +2,7 @@
 
 | Doc | Version | Author | Written |
 |---|---|---|---|
-| EVM-001 | 1.6 | Kevin Kim | v1.0 before any model was trained; v1.1 and v1.2 after D1, before any D2 result; v1.3 after a one-seed D2 preview; v1.4 after the full D2 run; v1.5 after the personalized variants; v1.6 while the v1.5 test was running, before any v1.6 result (see Section 12) |
+| EVM-001 | 1.7 | Kevin Kim | v1.0 before any model was trained; v1.1 and v1.2 after D1, before any D2 result; v1.3 after a one-seed D2 preview; v1.4 after the full D2 run; v1.5 after the personalized variants; v1.6 while the v1.5 test was running, before any v1.6 result; v1.7 before the lockbox audit (see Section 13) |
 
 This document fixes how models are trained, tuned and scored for Deliverables 1 and 2. It adds detail to the verification plan (tag `vtp-1.0`) and doesn't change any of its pass/fail criteria. It is committed before any model is trained so the Git history shows these choices came first. Anything changed after results are seen goes in the version history (Section 11) with a reason.
 
@@ -177,7 +177,21 @@ This is a characterization, with no pass/fail threshold. It uses the same patien
   * scaling to a baseline may remove differences between states (for example sleep and wake) that carry information;
   * with 22 patients, real gains of a few hundredths may not be distinguishable from noise.
 
-## 12. Version history
+## 12. Lockbox: SeizeIT2 (added in v1.7)
+
+SeizeIT2 v1.1.0 (OpenNeuro ds005873, CC0 licence) was downloaded on 2026-09-28 into `data/raw/seizeit2_v1.1.0/`: 24,877 files, 117.2 GiB. It has 125 patients with focal epilepsy, behind-the-ear EEG and other wearable signals. It is kept sealed until the final design is frozen, so it can give one unbiased test of that design.
+
+**Allowed before the design is frozen:**
+
+* file counts and sizes;
+* `dataset_description.json` and `CHANGES`, to confirm the version;
+* the blind feasibility audit (`scripts/audit_seizeit2.py`). It reads only file listings, EDF headers (channel names, sampling rates, durations and start times), and the column names and event categories of the annotation files. It reports seizure numbers only as totals across the whole dataset. Its report, `results/lockbox/seizeit2_feasibility.md`, is committed as a record of what was looked at.
+
+**Not allowed before the design is frozen:** reading or plotting EEG samples, computing features, looking at any seizure timing or at any per-patient seizure information, or running any model on the data.
+
+**Planned use.** Once the design is frozen, and written down here as a new version, the frozen method is applied once to SeizeIT2. The personalized pipeline and its rules stay unchanged, apart from a channel-mapping adapter for the behind-the-ear EEG, which is written using only the audit's header information. The results are reported whatever they are, and nothing is changed after seeing them.
+
+## 13. Version history
 
 | Version | Date | Change |
 |---|---|---|
@@ -188,3 +202,4 @@ This is a characterization, with no pass/fail threshold. It uses the same patien
 | 1.4 | 2026-09-27 | After the full D2 run (VT-15 and VT-17 failed; the patient-specific test gave 0.662): added the personalized variants (Section 11.1), before running them. Nothing about D1, D2 or the patient-specific test changed |
 | 1.5 | 2026-09-27 | After the personalized variants (best: other patients + this patient, AUROC 0.698): added the alarm-level test of the personalized designs (Section 11.2), before running it |
 | 1.6 | 2026-09-27 | While the v1.5 test was running and before any v1.6 result: added feature set v2 and the personal baseline (Section 11.3) |
+| 1.7 | 2026-09-28 | Before any look at SeizeIT2 beyond file counts and the version files: added the lockbox rules and the blind feasibility audit (Section 12) |
