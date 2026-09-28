@@ -1,6 +1,6 @@
 # SeizeIT2 blind feasibility audit
 
-Generated 2026-09-28T08:23:25 with `scripts/audit_seizeit2.py`. Only file listings, EDF headers and annotation column names and categories were read. No EEG samples were read, no seizure timings were looked at, and seizure numbers are totals across the whole dataset (docs/evaluation_methods.md v1.7, Section 12).
+Generated 2026-09-28T08:29:27 with `scripts/audit_seizeit2.py`. Only file listings, EDF headers and annotation column names and categories were read. No EEG samples were read, no seizure timings were looked at, and seizure numbers are totals across the whole dataset (docs/evaluation_methods.md v1.7, Section 12).
 
 ## Files
 
@@ -28,3 +28,8 @@ Generated 2026-09-28T08:23:25 with `scripts/audit_seizeit2.py`. Only file listin
 - Column sets: onset, duration, eventType, lateralization, localization, vigilance, confidence, channels, dateTime, recordingDuration (2850 files)
 - Event categories: bckg (2313); impd (464); sz_foc_ia_nm (160); sz_foc_a_m_hyperkinetic (158); sz_foc_ia_m_hyperkinetic (100); sz_foc_a_nm (66); sz_foc_ia_m_automatisms (62); sz_foc_f2b (55); sz_foc_a_um (50); sz_foc_ua_um (41); sz_foc_ua_nm (40); sz_foc_a_nm_behavior (38); sz_foc_ia (35); sz_foc_ia_m_tonic (24); sz_foc_ua_nm_behavior (17)
 - Seizure events in total: 883; subjects with at least one: 125; with at least two (needed for the patient-specific design): 97
+
+## Recording timing (v1.8; recording start times only)
+
+- scans.tsv files: 0; column sets: 
+- EEG recordings with an acq_time: 0; of those at exactly midnight: 0
