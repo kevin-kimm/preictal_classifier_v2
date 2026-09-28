@@ -12,11 +12,18 @@ as the patient-specific test, so every variant is scored on exactly the same tes
 The patient-only EEG model and clock-only model are read from the patient-specific
 test (results/d2/patient_specific.csv) for comparison.
 
+Feature set v2 and the personal baseline (evaluation methods v1.6, Section 11.3):
+    --feature-set v2        use data/processed/features_v2 (run extract_features.py --feature-set v2 first)
+    --personal-baseline     scale each patient's EEG features by the median and interquartile range of
+                            their own interictal training windows (no seizures needed); other patients
+                            are scaled by their own interictal windows
+    --tag _v2               output file suffix; the report then also compares with the v1 results
+
 Usage, from the repo root with .venv active:
     python scripts/run_personalized.py                   all variants, five seeds (about 2 h)
     python scripts/run_personalized.py --seeds 0         quicker look
 
-Outputs: results/d2/personalized.md and personalized.csv
+Outputs: results/d2/personalized<tag>.md and personalized<tag>.csv
 """
 
 from __future__ import annotations
@@ -42,7 +49,7 @@ from preictal.data.loaders import DEFAULT_CORRECTIONS  # noqa: E402
 from preictal.evaluation.lopo import read_label_report  # noqa: E402
 from preictal.evaluation.metrics import bootstrap_ci  # noqa: E402
 from preictal.evaluation.patient_specific import patient_folds  # noqa: E402
-from preictal.features.build_features import feature_version  # noqa: E402
+from preictal.features.build_features import FEATURE_VERSION, FEATURE_VERSION_V2, feature_version  # noqa: E402
 from preictal.features.transforms import cache_key, clock_features, context_features, timeline_has_clock  # noqa: E402
 from preictal.models.model import build_model, predict_proba  # noqa: E402
 from preictal.models.train import TRAIN_CLASSES, blend_weights, load_windows, sample_weights  # noqa: E402
@@ -77,10 +84,15 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--seeds", type=int, nargs="+", default=None)
     ap.add_argument("--variants", nargs="+", default=list(VARIANTS), choices=VARIANTS)
-    ap.add_argument("--features", type=Path, default=REPO / "data" / "processed" / "features")
+    ap.add_argument("--features", type=Path, default=None)
+    ap.add_argument("--feature-set", choices=["v1", "v2"], default="v1")
+    ap.add_argument("--personal-baseline", action="store_true")
+    ap.add_argument("--tag", default="")
     ap.add_argument("--out", type=Path, default=REPO / "results" / "d2")
     args = ap.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
+    if args.features is None:
+        args.features = REPO / "data" / "processed" / ("features_v2" if args.feature_set == "v2" else "features")
 
     cfg = load_config()
     rules = LabelRules.from_config(cfg)
@@ -88,7 +100,7 @@ def main():
     step_s = cfg["windows"]["step_s"]
     datasets = tuple(cfg["training"]["datasets"])
     corrections = DEFAULT_CORRECTIONS.read_text() if DEFAULT_CORRECTIONS.exists() else ""
-    version = feature_version(cfg, corrections)
+    version = feature_version(cfg, corrections, FEATURE_VERSION_V2 if args.feature_set == "v2" else FEATURE_VERSION)
     subjects = read_label_report(REPO / "results" / "d1" / "label_report.csv")
     tl_info = json.loads((args.features / "timelines.json").read_text())
 
@@ -118,7 +130,29 @@ def main():
         if len(events) >= 2 and (W.y[rows] == INTERICTAL).sum() * step_s >= 3600:
             patients.append((subject, code, rows, events))
     pool = {s for s, i in subjects.items() if i.dataset in datasets and i.role == "train_test"}
-    print(f"{len(patients)} patients; variants: {', '.join(args.variants)}")
+    print(f"{len(patients)} patients; variants: {', '.join(args.variants)}; feature set {args.feature_set}"
+          + ("; personal baseline" if args.personal_baseline else ""))
+    mats = {"ps_eeg_clock": X_clock, "general": X_clock, "general_personal": X_clock, "ps_eeg_ctx_clock": X_ctx_clock}
+
+    def scale(M, ref):
+        """Scale every column except the two clock columns by ref's median and interquartile range."""
+        out = M.copy()
+        with np.errstate(all="ignore"):
+            med = np.nanmedian(ref[:, :-2], axis=0)
+            iqr = np.maximum(np.nanpercentile(ref[:, :-2], 75, axis=0) - np.nanpercentile(ref[:, :-2], 25, axis=0), 1e-3)
+        out[:, :-2] = (M[:, :-2] - med) / iqr
+        return out
+
+    scaled_all = {}
+    if args.personal_baseline:          # every patient scaled by all of their own interictal windows
+        for key in {"clock", "ctx"} & {"ctx" if v == "ps_eeg_ctx_clock" else "clock" for v in args.variants}:
+            M = X_ctx_clock if key == "ctx" else X_clock
+            S = np.empty_like(M)
+            for code in range(len(W.subjects)):
+                r = np.flatnonzero(W.subject == code)
+                ref = r[W.y[r] == INTERICTAL]
+                S[r] = scale(M[r], M[ref]) if len(ref) else M[r]
+            scaled_all[key] = S
 
     rows_out = []
     it = tqdm(patients, desc="patients") if tqdm else patients
@@ -130,30 +164,41 @@ def main():
         others = W.rows(pool - {subject})
         others = others[np.isin(W.y[others], TRAIN_CLASSES)]
         others = others[np.round(W.t_end[others] / 5.0).astype(np.int64) % OTHERS_EVERY == 0]
+        def patient_matrix(v, train):
+            """This patient's rows for variant v, scaled by the fold's training interictal windows if asked."""
+            M = mats[v][rows]
+            if not args.personal_baseline:
+                return M
+            ref = train[y[train] == INTERICTAL]
+            return scale(M, M[ref])
+
+        def others_matrix(v):
+            key = "ctx" if v == "ps_eeg_ctx_clock" else "clock"
+            return scaled_all[key][others] if args.personal_baseline else mats[v][others]
+
         for seed in seeds:
             preds, labels = defaultdict(list), []
             general = None
             if "general" in args.variants:
-                general = fit(X_clock[others], W.y[others], sample_weights(W.y[others], W.subject[others]), seed)
+                general = fit(others_matrix("general"), W.y[others], sample_weights(W.y[others], W.subject[others]), seed)
             for i, train, test in folds:
                 labels.append(y[test])
-                r_tr, r_te = rows[train], rows[test]
-                keep = np.isin(y[train], TRAIN_CLASSES)
-                r_tr = r_tr[keep]
-                w_self = sample_weights(W.y[r_tr], np.zeros(len(r_tr), dtype=int))
-                if "ps_eeg_clock" in args.variants:
-                    m = fit(X_clock[r_tr], W.y[r_tr], w_self, seed)
-                    preds["ps_eeg_clock"].append(predict_proba(m, X_clock[r_te])[:, 0])
-                if "ps_eeg_ctx_clock" in args.variants:
-                    m = fit(X_ctx_clock[r_tr], W.y[r_tr], w_self, seed)
-                    preds["ps_eeg_ctx_clock"].append(predict_proba(m, X_ctx_clock[r_te])[:, 0])
+                tr = train[np.isin(y[train], TRAIN_CLASSES)]
+                w_self = sample_weights(y[tr], np.zeros(len(tr), dtype=int))
+                for v in ("ps_eeg_clock", "ps_eeg_ctx_clock"):
+                    if v in args.variants:
+                        P = patient_matrix(v, train)
+                        m = fit(P[tr], y[tr], w_self, seed)
+                        preds[v].append(predict_proba(m, P[test])[:, 0])
                 if general is not None:
-                    preds["general"].append(predict_proba(general, X_clock[r_te])[:, 0])
+                    P = patient_matrix("general", train)
+                    preds["general"].append(predict_proba(general, P[test])[:, 0])
                 if "general_personal" in args.variants:
-                    wg, wp = blend_weights(W.y[others], W.subject[others], W.y[r_tr], 0.5)
-                    m = fit(np.vstack([X_clock[others], X_clock[r_tr]]), np.concatenate([W.y[others], W.y[r_tr]]),
+                    P = patient_matrix("general_personal", train)
+                    wg, wp = blend_weights(W.y[others], W.subject[others], y[tr], 0.5)
+                    m = fit(np.vstack([others_matrix("general_personal"), P[tr]]), np.concatenate([W.y[others], y[tr]]),
                             np.concatenate([wg, wp]), seed)
-                    preds["general_personal"].append(predict_proba(m, X_clock[r_te])[:, 0])
+                    preds["general_personal"].append(predict_proba(m, P[test])[:, 0])
             if not folds:
                 continue
             lab = np.concatenate(labels)
@@ -174,8 +219,25 @@ def main():
                                                         "ps_clock": float(r["clock_only_auroc"])}
     for r in rows_out:
         r.update(prev.get((r["subject"], r["seed"]), {"ps_eeg": float("nan"), "ps_clock": float("nan")}))
+    v1_file = args.out / "personalized.csv"
+    v1_shown = []
+    if args.tag and v1_file.exists():
+        v1 = {}
+        for r in csv.DictReader(open(v1_file)):
+            if int(r["seed"]) in seeds:
+                v1[(r["subject"], int(r["seed"]))] = r
+        for v in args.variants:
+            key = f"{v}_v1"
+            LABELS[key] = LABELS[v] + " (feature set v1, no baseline)"
+            v1_shown.append(key)
+            for r in rows_out:
+                old = v1.get((r["subject"], r["seed"]), {})
+                r[key] = float(old[v]) if old.get(v) not in (None, "") else float("nan")
+    suffix = f" (feature set {args.feature_set}" + (", personal baseline)" if args.personal_baseline else ")")
+    for v in args.variants:
+        LABELS[v] = LABELS[v] + suffix
 
-    shown = ["ps_eeg", "ps_clock"] + list(args.variants)
+    shown = ["ps_eeg", "ps_clock"] + v1_shown + list(args.variants)
     per_patient = defaultdict(lambda: defaultdict(list))
     for r in rows_out:
         for v in shown:
@@ -198,13 +260,14 @@ def main():
             p = float("nan")
         return p, sum(xi > zi for xi, zi in pairs), len(pairs)
 
-    with open(args.out / "personalized.csv", "w", newline="") as fh:
+    with open(args.out / f"personalized{args.tag}.csv", "w", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=list(rows_out[0]), lineterminator="\n")
         w.writeheader()
         w.writerows(rows_out)
     lines = ["# Personalized models (characterization)", "",
              f"Generated {datetime.now().isoformat(timespec='seconds')} · seeds {seeds} · {len(means)} patients · "
-             "docs/evaluation_methods.md v1.4, Section 11.1. Every variant is scored on the same test windows.", "",
+             "docs/evaluation_methods.md v1.4, Section 11.1 (and v1.6, Section 11.3). Every variant is scored on "
+             "the same test windows.", "",
              "| Model | Mean AUROC | 95% CI | Beats the patient's clock-only model | p (vs clock only) |",
              "|---|---|---|---|---|"]
     for v in shown:
@@ -213,7 +276,7 @@ def main():
         beat = f"{wins} of {n}" if v != "ps_clock" else "–"
         lines.append(f"| {LABELS[v]} | {mean:.3f} | {ci[0]:.3f}–{ci[1]:.3f} | {beat} | {p:.3g} |")
     comps = [("general_personal", "general"), ("general_personal", "ps_eeg"), ("ps_eeg_clock", "ps_eeg"),
-             ("ps_eeg_ctx_clock", "ps_eeg_clock")]
+             ("ps_eeg_ctx_clock", "ps_eeg_clock")] + [(v, f"{v}_v1") for v in args.variants]
     lines += ["", "## Paired comparisons (per patient, mean over seeds)", "",
               "| Comparison | Patients where the first is higher | Wilcoxon p |", "|---|---|---|"]
     for a, b in comps:
@@ -226,7 +289,7 @@ def main():
     seizures = {r["subject"]: r["seizures"] for r in rows_out}
     for s in sorted(means, key=lambda s: -means[s].get("general_personal", means[s]["ps_eeg"])):
         lines.append(f"| {s} | {seizures[s]} | " + " | ".join(f"{means[s][v]:.3f}" for v in shown) + " |")
-    (args.out / "personalized.md").write_text("\n".join(lines) + "\n")
+    (args.out / f"personalized{args.tag}.md").write_text("\n".join(lines) + "\n")
 
     print()
     for v in shown:
@@ -235,7 +298,11 @@ def main():
     if "general_personal" in shown and "general" in shown:
         p, wins, n = paired("general_personal", "general")
         print(f"Adding the patient's own data helped in {wins} of {n} patients (Wilcoxon p {p:.3g})")
-    print(f"Report: {args.out / 'personalized.md'}")
+    for v in args.variants:
+        if f"{v}_v1" in shown:
+            p, wins, n = paired(v, f"{v}_v1")
+            print(f"{v}: this run beat the v1 result in {wins} of {n} patients (Wilcoxon p {p:.3g})")
+    print(f"Report: {args.out / f'personalized{args.tag}.md'}")
 
 
 if __name__ == "__main__":

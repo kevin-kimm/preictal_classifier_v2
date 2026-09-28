@@ -2,7 +2,7 @@
 
 | Doc | Version | Author | Written |
 |---|---|---|---|
-| EVM-001 | 1.5 | Kevin Kim | v1.0 before any model was trained; v1.1 and v1.2 after D1, before any D2 result; v1.3 after a one-seed D2 preview; v1.4 after the full D2 run; v1.5 after the personalized variants (see Section 12) |
+| EVM-001 | 1.6 | Kevin Kim | v1.0 before any model was trained; v1.1 and v1.2 after D1, before any D2 result; v1.3 after a one-seed D2 preview; v1.4 after the full D2 run; v1.5 after the personalized variants; v1.6 while the v1.5 test was running, before any v1.6 result (see Section 12) |
 
 This document fixes how models are trained, tuned and scored for Deliverables 1 and 2. It adds detail to the verification plan (tag `vtp-1.0`) and doesn't change any of its pass/fail criteria. It is committed before any model is trained so the Git history shows these choices came first. Anything changed after results are seen goes in the version history (Section 11) with a reason.
 
@@ -162,6 +162,21 @@ This is a characterization, with no pass/fail threshold. It measures what share 
 * **False alarms.** Every alarm on the held-out interictal chunk is a false alarm, and the rate is false alarms over that chunk's hours.
 * **Reporting.** Sensitivity, false alarms per 24 h and the chance comparison are pooled over patients for each seed and averaged over seeds. The report also gives the number of patients with at least one seizure warned, and per-patient results.
 
+### 11.3 Feature set v2 and a personal baseline (added in v1.6)
+
+This is a characterization, with no pass/fail threshold. It uses the same patients, folds, buffers and seeds as Section 11.1, and settings fixed in advance (`scripts/run_personalized.py --feature-set v2`).
+
+* **Feature set v2** (`src/preictal/features/build_features.py`, version `d2-v2`):
+  * *Per derivation:* D1's 15 features plus 4 more: spectral entropy, peak frequency, log(theta/alpha) and log((delta+theta)/(alpha+beta)), pooled by mean, standard deviation, minimum and maximum as in D1 (76).
+  * *Connectivity (12):* for 1–40, 4–8 and 13–30 Hz (causal 4th-order Butterworth filters, with 10 s of warm-up where the recording allows), the correlation matrix of the present derivations over each window gives four numbers. They are the mean absolute correlation, the largest eigenvalue as a fraction of the number of channels, the normalized entropy of the eigenvalues, and the mean absolute correlation between left-right homologous derivations.
+  * *In total:* 88 EEG features, plus the time of day. Extracted with `scripts/extract_features.py --feature-set v2` into `data/processed/features_v2/`; the v1 features are unchanged.
+* **Personal baseline.** Each patient's EEG features (not the time of day) are scaled by the median and interquartile range of their own interictal windows (floor 0.001). For the test patient, only the fold's training interictal windows are used; other patients use all their interictal windows. It needs no seizures, so a device could learn it from its wearer's first days of normal EEG.
+* **Variants.** Other patients only, and other patients + this patient (half the weight), each with feature set v2 and each without and with the personal baseline: four results. Each is compared per patient with the same design using feature set v1 (Section 11.1), by Wilcoxon test and the number of patients where it is higher.
+* **Risks stated in advance:**
+  * more features give the patient-specific part more room to overfit a few seizures;
+  * scaling to a baseline may remove differences between states (for example sleep and wake) that carry information;
+  * with 22 patients, real gains of a few hundredths may not be distinguishable from noise.
+
 ## 12. Version history
 
 | Version | Date | Change |
@@ -172,3 +187,4 @@ This is a characterization, with no pass/fail threshold. It measures what share 
 | 1.3 | 2026-09-26 | After a one-seed D2 preview (v1.2), which showed cross-patient EEG performance at chance without time-of-day features (0.505; 0.600 with them; clock-only 0.697) and 0.00 false alarms on the false-alarm sets because those recordings have no clock time. Added: the neural network specification (step 5 was already planned), the false-alarm scoring fix, selection fits on every third window, and the patient-specific test (Section 11). The step order and selection rules are unchanged. The preview itself is kept as a record and not reported as the D2 result |
 | 1.4 | 2026-09-27 | After the full D2 run (VT-15 and VT-17 failed; the patient-specific test gave 0.662): added the personalized variants (Section 11.1), before running them. Nothing about D1, D2 or the patient-specific test changed |
 | 1.5 | 2026-09-27 | After the personalized variants (best: other patients + this patient, AUROC 0.698): added the alarm-level test of the personalized designs (Section 11.2), before running it |
+| 1.6 | 2026-09-27 | While the v1.5 test was running and before any v1.6 result: added feature set v2 and the personal baseline (Section 11.3) |

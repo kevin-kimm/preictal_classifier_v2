@@ -26,7 +26,7 @@ import json
 import warnings
 
 import numpy as np
-from scipy.signal import get_window
+from scipy.signal import butter, get_window, sosfilt
 
 from ..data.edf import EDFHeader
 from ..data.harmonize import DERIVATIONS, harmonize
@@ -38,6 +38,17 @@ FEATURES = ([f"logpow_{b}" for b in BANDS] + [f"relpow_{b}" for b in BANDS]
 POOL_STATS = ("mean", "std", "min", "max")
 POOLED_FEATURES = [f"{s}_{f}" for f in FEATURES for s in POOL_STATS]
 FEATURE_VERSION = "d1-v1"
+
+# Feature set v2 (evaluation methods v1.6): 4 more features per derivation, plus
+# 12 connectivity features computed across derivations.
+EXTRA_FEATURES = ["spectral_entropy", "peak_frequency", "log_theta_alpha", "log_slow_fast"]
+FEATURES_V2 = FEATURES + EXTRA_FEATURES
+CONNECTIVITY_BANDS = {"broad": (1.0, 40.0), "theta": (4.0, 8.0), "beta": (13.0, 30.0)}
+CONNECTIVITY_STATS = ("mean_abs_corr", "lambda1_fraction", "eigen_entropy", "homologous_abs_corr")
+CONNECTIVITY_FEATURES = [f"{b}_{s}" for b in CONNECTIVITY_BANDS for s in CONNECTIVITY_STATS]
+FEATURE_VERSION_V2 = "d2-v2"
+HOMOLOGOUS = [("FP1-F7", "FP2-F8"), ("F7-T7", "F8-T8"), ("T7-P7", "T8-P8"), ("P7-O1", "P8-O2"),
+              ("FP1-F3", "FP2-F4"), ("F3-C3", "F4-C4"), ("C3-P3", "C4-P4"), ("P3-O1", "P4-O2")]
 EPS = 1e-12
 CYTON_DERIVATIONS = ("F7-T7", "T7-P7", "P7-O1", "F8-T8", "T8-P8", "P8-O2")
 
@@ -62,8 +73,11 @@ def _window_means(values: np.ndarray, starts: np.ndarray, length: int) -> np.nda
 
 
 def channel_features(x: np.ndarray, fs: float, starts: np.ndarray, length: int,
-                     welch_seg_s: float = 2.0) -> np.ndarray:
-    """Features (n_windows x 15) for one derivation. starts/length are in samples."""
+                     welch_seg_s: float = 2.0, extra: bool = False) -> np.ndarray:
+    """Features (n_windows x 15, or x 19 with extra=True) for one derivation.
+
+    starts/length are in samples.
+    """
     seg = int(round(welch_seg_s * fs))
     hop = seg // 2
     if np.any(starts % hop):
@@ -98,19 +112,74 @@ def channel_features(x: np.ndarray, fs: float, starts: np.ndarray, length: int,
         mobility = np.where(var > EPS, np.sqrt(var_d / var), np.nan)
         complexity = np.where(var_d > EPS, np.sqrt(var_dd / var_d) / mobility, np.nan)
 
-    return np.column_stack([
-        np.log10(band_power + EPS), rel,
-        np.log10(line + EPS), np.log10(var + EPS), mobility, complexity, sef,
-    ]).astype(np.float32)
+    cols = [np.log10(band_power + EPS), rel, np.log10(line + EPS), np.log10(var + EPS), mobility, complexity, sef]
+    if extra:
+        p = wpsd[:, total_mask]
+        with np.errstate(invalid="ignore", divide="ignore"):
+            q = p / p.sum(axis=1, keepdims=True)
+            entropy = -np.nansum(np.where(q > 0, q * np.log(q), 0.0), axis=1) / np.log(p.shape[1])
+        entropy = np.where(total > 0, entropy, np.nan)
+        peak = np.where(total > 0, freqs[total_mask][np.argmax(p, axis=1)], np.nan)
+        d, th, al, be = band_power[:, 0], band_power[:, 1], band_power[:, 2], band_power[:, 3]
+        cols += [entropy, peak, np.log10((th + EPS) / (al + EPS)), np.log10((d + th + EPS) / (al + be + EPS))]
+    return np.column_stack(cols).astype(np.float32)
 
 
 def window_features(data: np.ndarray, present: np.ndarray, fs: float, starts: np.ndarray,
-                    length: int) -> np.ndarray:
-    """Features (n_windows x 18 x 15) for harmonized data. Absent derivations are NaN."""
-    out = np.full((len(starts), data.shape[0], len(FEATURES)), np.nan, dtype=np.float32)
+                    length: int, extra: bool = False) -> np.ndarray:
+    """Features (n_windows x 18 x 15, or 19 with extra) for harmonized data. Absent derivations are NaN."""
+    n_feat = len(FEATURES_V2) if extra else len(FEATURES)
+    out = np.full((len(starts), data.shape[0], n_feat), np.nan, dtype=np.float32)
     for k in range(data.shape[0]):
         if present[k]:
-            out[:, k, :] = channel_features(data[k], fs, starts, length)
+            out[:, k, :] = channel_features(data[k], fs, starts, length, extra=extra)
+    return out
+
+
+def connectivity_features(data: np.ndarray, present: np.ndarray, fs: float, starts: np.ndarray,
+                          length: int, warmup: int = 0, batch: int = 64) -> np.ndarray:
+    """Connectivity (n_windows x 12) across the derivations present.
+
+    For each band (1-40, 4-8 and 13-30 Hz; causal 4th-order Butterworth filter),
+    the correlation matrix of the present derivations over each window gives: the mean
+    absolute correlation, the largest eigenvalue as a fraction of the number of channels,
+    the normalized entropy of the eigenvalues, and the mean absolute correlation between
+    left-right homologous derivations. starts are sample indices into data, which begins
+    `warmup` samples before the first window so the filters can settle.
+    """
+    idx = np.flatnonzero(present)
+    out = np.full((len(starts), len(CONNECTIVITY_FEATURES)), np.nan, dtype=np.float32)
+    if len(idx) < 2:
+        return out
+    names = [DERIVATIONS[i] for i in idx]
+    pairs = [(names.index(a), names.index(b)) for a, b in HOMOLOGOUS if a in names and b in names]
+    k = len(idx)
+    iu = np.triu_indices(k, 1)
+    for bi, (lo, hi) in enumerate(CONNECTIVITY_BANDS.values()):
+        sos = butter(4, [lo, hi], btype="bandpass", fs=fs, output="sos")
+        x = sosfilt(sos, data[idx], axis=1)
+        for b0 in range(0, len(starts), batch):
+            st = starts[b0:b0 + batch]
+            seg = np.stack([x[:, s:s + length] for s in st])                     # b x k x L
+            seg = seg - seg.mean(axis=2, keepdims=True)
+            cov = seg @ seg.transpose(0, 2, 1) / length
+            sd = np.sqrt(np.clip(np.diagonal(cov, axis1=1, axis2=2), 0, None))
+            with np.errstate(invalid="ignore", divide="ignore"):
+                corr = cov / (sd[:, :, None] * sd[:, None, :])
+            corr = np.nan_to_num(corr)
+            corr[:, np.arange(k), np.arange(k)] = 1.0
+            ev = np.clip(np.linalg.eigvalsh(corr), 0, None)
+            pe = ev / ev.sum(axis=1, keepdims=True)
+            with np.errstate(invalid="ignore", divide="ignore"):
+                ent = -np.sum(np.where(pe > 0, pe * np.log(pe), 0.0), axis=1) / np.log(k)
+            f = np.column_stack([
+                np.abs(corr[:, iu[0], iu[1]]).mean(axis=1),
+                ev.max(axis=1) / k,
+                ent,
+                np.abs(np.stack([corr[:, a, b] for a, b in pairs], axis=1)).mean(axis=1) if pairs
+                else np.full(len(st), np.nan),
+            ])
+            out[b0:b0 + batch, bi * 4:(bi + 1) * 4] = f
     return out
 
 
@@ -137,6 +206,28 @@ def recording_features(hdr: EDFHeader, starts_s: np.ndarray, length_s: float,
     return feats, present
 
 
+def recording_features_v2(hdr: EDFHeader, starts_s: np.ndarray, length_s: float, chunk_windows: int = 720,
+                          warmup_s: float = 10.0):
+    """Feature set v2: per-derivation features (n x 18 x 19), connectivity (n x 12), presence flags."""
+    starts_s = np.asarray(starts_s, dtype=float)
+    feats = np.full((len(starts_s), len(DERIVATIONS), len(FEATURES_V2)), np.nan, dtype=np.float32)
+    conn = np.full((len(starts_s), len(CONNECTIVITY_FEATURES)), np.nan, dtype=np.float32)
+    present = np.zeros(len(DERIVATIONS), dtype=bool)
+    for k0 in range(0, len(starts_s), chunk_windows):
+        chunk = starts_s[k0:k0 + chunk_windows]
+        lead = min(warmup_s, chunk[0])                 # filter warm-up, where the recording allows
+        lead = np.floor(lead)
+        h = harmonize(hdr, start_s=chunk[0] - lead, stop_s=chunk[-1] + length_s)
+        present = h.present
+        idx = np.round((chunk - h.t0) * h.fs).astype(int)
+        length = int(round(length_s * h.fs))
+        ok = idx + length <= h.n_samples
+        if ok.any():
+            feats[k0:k0 + len(chunk)][ok] = window_features(h.data, h.present, h.fs, idx[ok], length, extra=True)
+            conn[k0:k0 + len(chunk)][ok] = connectivity_features(h.data, h.present, h.fs, idx[ok], length)
+    return feats, conn, present
+
+
 def pool(per_channel: np.ndarray, channels: np.ndarray | None = None) -> np.ndarray:
     """Montage-agnostic summary: mean, std, min and max of each feature over channels.
 
@@ -150,15 +241,15 @@ def pool(per_channel: np.ndarray, channels: np.ndarray | None = None) -> np.ndar
     return np.stack(stats, axis=2).reshape(len(x), -1).astype(np.float32)
 
 
-def feature_version(cfg: dict, corrections_text: str = "") -> str:
+def feature_version(cfg: dict, corrections_text: str = "", code: str = FEATURE_VERSION) -> str:
     """Identifier of everything the stored features and labels depend on.
 
     Feature files made with a different version are recomputed, so changing the
     label rules, window settings, feature settings or annotation corrections can't
     silently mix old and new files.
     """
-    key = json.dumps({"code": FEATURE_VERSION, "labels": cfg["labels"],
+    key = json.dumps({"code": code, "labels": cfg["labels"],
                       "windows": {k: cfg["windows"][k] for k in ("length_s", "step_s")},
                       "features": cfg["features"], "corrections": corrections_text}, sort_keys=True)
-    return f"{FEATURE_VERSION}-{hashlib.sha256(key.encode()).hexdigest()[:10]}"
+    return f"{code}-{hashlib.sha256(key.encode()).hexdigest()[:10]}"
 

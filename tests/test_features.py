@@ -111,3 +111,54 @@ def test_features_do_not_depend_on_chunking(tmp_path):
     assert present.all()
     assert np.allclose(one, many, rtol=1e-4, atol=1e-4, equal_nan=True)
     assert not np.isnan(one).any()
+
+
+# ---------------------------------------------------------------- feature set v2 (evaluation methods v1.6)
+
+def test_extra_features_on_a_sine_and_on_noise():
+    from preictal.features.build_features import FEATURES_V2
+    G = {n: i for i, n in enumerate(FEATURES_V2)}
+    s = channel_features(sine(10.0), FS, np.array([0]), L, extra=True)[0]
+    assert s.shape == (19,) and np.allclose(s[:15], channel_features(sine(10.0), FS, np.array([0]), L)[0])
+    assert s[G["peak_frequency"]] == pytest.approx(10.0, abs=0.5)
+    assert s[G["spectral_entropy"]] < 0.3 and s[G["log_theta_alpha"]] < -1
+    n = channel_features(np.random.default_rng(0).normal(0, 20, 120 * FS), FS, np.array([0]), L, extra=True)[0]
+    assert n[G["spectral_entropy"]] > 0.9
+
+
+def test_connectivity_identical_vs_independent_channels():
+    from preictal.features.build_features import CONNECTIVITY_FEATURES, connectivity_features
+    C = {n: i for i, n in enumerate(CONNECTIVITY_FEATURES)}
+    rng = np.random.default_rng(0)
+    base = rng.normal(0, 20, 60 * FS)
+    same = np.tile(base, (18, 1))
+    indep = rng.normal(0, 20, (18, 60 * FS))
+    present = np.ones(18, bool)
+    a = connectivity_features(same, present, FS, np.array([10 * FS]), L)[0]
+    b = connectivity_features(indep, present, FS, np.array([10 * FS]), L)[0]
+    assert a[C["broad_mean_abs_corr"]] > 0.99 and a[C["broad_lambda1_fraction"]] > 0.99
+    assert a[C["broad_eigen_entropy"]] < 0.05 and a[C["broad_homologous_abs_corr"]] > 0.99
+    assert b[C["broad_mean_abs_corr"]] < 0.1 and b[C["broad_eigen_entropy"]] > 0.95
+
+
+def test_connectivity_handles_missing_and_cyton_channels():
+    from preictal.features.build_features import connectivity_features
+    rng = np.random.default_rng(1)
+    x = rng.normal(0, 20, (18, 60 * FS))
+    cyton = np.array([d in CYTON_DERIVATIONS for d in DERIVATIONS])
+    f = connectivity_features(x, cyton, FS, np.array([10 * FS]), L)[0]
+    assert not np.isnan(f).any()                       # Cyton layout has homologous pairs
+    one = np.zeros(18, bool)
+    one[0] = True
+    assert np.isnan(connectivity_features(x, one, FS, np.array([10 * FS]), L)).all()
+
+
+def test_v2_features_do_not_depend_on_chunking(tmp_path):
+    from preictal.features.build_features import recording_features_v2
+    hdr = read_header(_siena_like_edf(tmp_path))
+    starts = np.arange(0, 200 - 30 + 1e-9, 5.0)
+    f1, c1, _ = recording_features_v2(hdr, starts, 30, chunk_windows=10_000)
+    f2, c2, _ = recording_features_v2(hdr, starts, 30, chunk_windows=7)
+    assert np.allclose(f1, f2, rtol=1e-4, atol=1e-4, equal_nan=True)
+    late = starts >= 10                                 # after the filter warm-up
+    assert np.allclose(c1[late], c2[late], atol=0.02)

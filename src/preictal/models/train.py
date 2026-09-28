@@ -45,7 +45,7 @@ def load_windows(feature_dir: Path, datasets: tuple[str, ...], subjects: set[str
     """Load feature files. With keep_per_channel=False only the pooled features are kept
     (per_channel is None), which saves memory. labels keeps only windows with those
     labels; every=k keeps every k-th of those windows per recording."""
-    parts = {k: [] for k in ("per_channel", "X", "y", "t_end", "subject", "timeline")}
+    parts = {k: [] for k in ("per_channel", "conn", "X", "y", "t_end", "subject", "timeline")}
     subj_codes, tl_codes = {}, {}
     for ds in datasets:
         for f in sorted((Path(feature_dir) / ds).glob("*.npz")):
@@ -62,10 +62,13 @@ def load_windows(feature_dir: Path, datasets: tuple[str, ...], subjects: set[str
             if n == 0:
                 continue
             feats = z["features"][keep]
+            conn = z["connectivity"][keep] if "connectivity" in z.files else None   # feature set v2
             if keep_per_channel:
                 parts["per_channel"].append(feats)
+                if conn is not None:
+                    parts["conn"].append(conn)
             else:
-                parts["X"].append(pool(feats))
+                parts["X"].append(pool(feats) if conn is None else np.hstack([pool(feats), conn]))
             parts["y"].append(z["labels"][keep])
             parts["t_end"].append(z["t_end"][keep])
             parts["subject"].append(np.full(n, subj_codes.setdefault(subject, len(subj_codes)), np.int32))
@@ -75,6 +78,8 @@ def load_windows(feature_dir: Path, datasets: tuple[str, ...], subjects: set[str
     if keep_per_channel:
         per_channel = np.concatenate(parts["per_channel"])
         X = pool(per_channel)
+        if parts["conn"]:
+            X = np.hstack([X, np.concatenate(parts["conn"])])
     else:
         per_channel, X = None, np.concatenate(parts["X"])
     return Windows(per_channel, X, np.concatenate(parts["y"]), np.concatenate(parts["t_end"]),

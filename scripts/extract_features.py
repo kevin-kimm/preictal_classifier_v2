@@ -7,6 +7,8 @@ and save them with the window labels and times.
 Usage, from the repo root with .venv active:
     python scripts/extract_features.py                              CHB-MIT and Siena (D1)
     python scripts/extract_features.py --datasets tusz mental_arith  false-alarm test sets
+    python scripts/extract_features.py --feature-set v2              feature set v2 (evaluation methods v1.6),
+                                                                     written to data/processed/features_v2
 
 Output (not in Git):
     data/processed/features/<dataset>/<recording>.npz
@@ -34,7 +36,9 @@ from preictal.config import load_config  # noqa: E402
 from preictal.data.edf import read_header  # noqa: E402
 from preictal.data.labels import INTERICTAL, LabelRules, build_timelines, window_labels  # noqa: E402
 from preictal.data.loaders import DEFAULT_CORRECTIONS, discover  # noqa: E402
-from preictal.features.build_features import feature_version, recording_features  # noqa: E402
+from preictal.features.build_features import (  # noqa: E402
+    FEATURE_VERSION, FEATURE_VERSION_V2, feature_version, recording_features, recording_features_v2,
+)
 from preictal.models.train import feature_file  # noqa: E402
 
 try:
@@ -44,11 +48,16 @@ except ImportError:
 
 
 def work(job):
-    path, out, meta, starts, labels, t_end, length_s = job
+    path, out, meta, starts, labels, t_end, length_s, feature_set = job
     hdr = read_header(path)
-    feats, present = recording_features(hdr, starts, length_s)
+    extra = {}
+    if feature_set == "v2":
+        feats, conn, present = recording_features_v2(hdr, starts, length_s)
+        extra["connectivity"] = conn
+    else:
+        feats, present = recording_features(hdr, starts, length_s)
     tmp = out.with_name(out.stem + ".tmp.npz")
-    np.savez(tmp, features=feats, present=present, labels=labels, starts=starts, t_end=t_end,
+    np.savez(tmp, features=feats, present=present, labels=labels, starts=starts, t_end=t_end, **extra,
              **{k: np.array(v) for k, v in meta.items()})
     tmp.rename(out)
     return out.name, len(starts), float(hdr.duration_s)
@@ -58,7 +67,8 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--datasets", nargs="+", default=["chbmit", "siena"])
     ap.add_argument("--data-root", type=Path, default=REPO / "data" / "raw")
-    ap.add_argument("--out", type=Path, default=REPO / "data" / "processed" / "features")
+    ap.add_argument("--feature-set", choices=["v1", "v2"], default="v1")
+    ap.add_argument("--out", type=Path, default=None)
     ap.add_argument("--workers", type=int, default=4)
     args = ap.parse_args()
 
@@ -66,7 +76,9 @@ def main():
     rules = LabelRules.from_config(cfg)
     length_s, step_s = cfg["windows"]["length_s"], cfg["windows"]["step_s"]
     corrections = DEFAULT_CORRECTIONS.read_text() if DEFAULT_CORRECTIONS.exists() else ""
-    version = feature_version(cfg, corrections)
+    if args.out is None:
+        args.out = REPO / "data" / "processed" / ("features_v2" if args.feature_set == "v2" else "features")
+    version = feature_version(cfg, corrections, FEATURE_VERSION_V2 if args.feature_set == "v2" else FEATURE_VERSION)
 
     recs = discover(args.data_root, datasets=tuple(args.datasets))
     print(f"{len(recs)} recordings in {', '.join(args.datasets)}; building timelines...")
@@ -102,7 +114,7 @@ def main():
             meta = {"version": version, "dataset": tl.dataset, "subject": tl.subject, "timeline": key,
                     "role": tl.role, "recording": p.rec.rel_path}
             jobs.append((str(p.rec.path), out, meta, starts, labels.astype(np.int8),
-                         p.start + starts + length_s, length_s))
+                         p.start + starts + length_s, length_s, args.feature_set))
             hours += p.duration / 3600
     args.out.mkdir(parents=True, exist_ok=True)
     tl_file.write_text(json.dumps(tl_info))
