@@ -18,6 +18,8 @@ Feature set v2 and the personal baseline (evaluation methods v1.6, Section 11.3)
                             their own interictal training windows (no seizures needed); other patients
                             are scaled by their own interictal windows
     --tag _v2               output file suffix; the report then also compares with the v1 results
+    --no-clock              leave out the time-of-day features (evaluation methods v1.8): SeizeIT2's
+                            clock times are anonymized, so the design tested there can't use them
 
 Usage, from the repo root with .venv active:
     python scripts/run_personalized.py                   all variants, five seeds (about 2 h)
@@ -88,6 +90,7 @@ def main():
     ap.add_argument("--feature-set", choices=["v1", "v2"], default="v1")
     ap.add_argument("--personal-baseline", action="store_true")
     ap.add_argument("--tag", default="")
+    ap.add_argument("--no-clock", action="store_true")
     ap.add_argument("--out", type=Path, default=REPO / "results" / "d2")
     args = ap.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
@@ -107,7 +110,8 @@ def main():
     print("Loading features...")
     W = load_windows(args.features, datasets, version=version, keep_per_channel=False)
     clock = clock_features(W.t_end, np.array([timeline_has_clock(k) for k in W.timelines])[W.timeline])
-    X_clock = np.hstack([W.X, clock])
+    n_clock = 0 if args.no_clock else 2
+    X_clock = W.X if args.no_clock else np.hstack([W.X, clock])
     X_ctx_clock = None
     if "ps_eeg_ctx_clock" in args.variants:
         cache = args.features.parent / "d2_cache" / f"train_ctx10r_{version}_{cache_key(W)}.npy"   # shared with run_d2.py
@@ -118,7 +122,7 @@ def main():
             ctx = context_features(W.X, W.timeline, W.t_end, 600)
             cache.parent.mkdir(parents=True, exist_ok=True)
             np.save(cache, ctx)
-        X_ctx_clock = np.hstack([W.X, ctx, clock])
+        X_ctx_clock = np.hstack([W.X, ctx] + ([] if args.no_clock else [clock]))
 
     patients = []
     for code, subject in enumerate(W.subjects):
@@ -135,12 +139,13 @@ def main():
     mats = {"ps_eeg_clock": X_clock, "general": X_clock, "general_personal": X_clock, "ps_eeg_ctx_clock": X_ctx_clock}
 
     def scale(M, ref):
-        """Scale every column except the two clock columns by ref's median and interquartile range."""
+        """Scale every column except the clock columns by ref's median and interquartile range."""
         out = M.copy()
+        k = M.shape[1] - n_clock
         with np.errstate(all="ignore"):
-            med = np.nanmedian(ref[:, :-2], axis=0)
-            iqr = np.maximum(np.nanpercentile(ref[:, :-2], 75, axis=0) - np.nanpercentile(ref[:, :-2], 25, axis=0), 1e-3)
-        out[:, :-2] = (M[:, :-2] - med) / iqr
+            med = np.nanmedian(ref[:, :k], axis=0)
+            iqr = np.maximum(np.nanpercentile(ref[:, :k], 75, axis=0) - np.nanpercentile(ref[:, :k], 25, axis=0), 1e-3)
+        out[:, :k] = (M[:, :k] - med) / iqr
         return out
 
     scaled_all = {}
@@ -233,9 +238,10 @@ def main():
             for r in rows_out:
                 old = v1.get((r["subject"], r["seed"]), {})
                 r[key] = float(old[v]) if old.get(v) not in (None, "") else float("nan")
-    suffix = f" (feature set {args.feature_set}" + (", personal baseline)" if args.personal_baseline else ")")
+    suffix = (f" (feature set {args.feature_set}" + (", personal baseline" if args.personal_baseline else "")
+              + (", no time of day)" if args.no_clock else ")"))
     for v in args.variants:
-        LABELS[v] = LABELS[v] + suffix
+        LABELS[v] = (LABELS[v].replace(" + time of day", "") if args.no_clock else LABELS[v]) + suffix
 
     shown = ["ps_eeg", "ps_clock"] + v1_shown + list(args.variants)
     per_patient = defaultdict(lambda: defaultdict(list))

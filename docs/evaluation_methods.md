@@ -2,7 +2,7 @@
 
 | Doc | Version | Author | Written |
 |---|---|---|---|
-| EVM-001 | 1.7 | Kevin Kim | v1.0 before any model was trained; v1.1 and v1.2 after D1, before any D2 result; v1.3 after a one-seed D2 preview; v1.4 after the full D2 run; v1.5 after the personalized variants; v1.6 while the v1.5 test was running, before any v1.6 result; v1.7 before the lockbox audit (see Section 13) |
+| EVM-001 | 1.8 | Kevin Kim | v1.0 before any model was trained; v1.1 and v1.2 after D1, before any D2 result; v1.3 after a one-seed D2 preview; v1.4 after the full D2 run; v1.5 after the personalized variants; v1.6 while the v1.5 test was running, before any v1.6 result; v1.7 before the lockbox audit; v1.8 after it (see Section 13) |
 
 This document fixes how models are trained, tuned and scored for Deliverables 1 and 2. It adds detail to the verification plan (tag `vtp-1.0`) and doesn't change any of its pass/fail criteria. It is committed before any model is trained so the Git history shows these choices came first. Anything changed after results are seen goes in the version history (Section 11) with a reason.
 
@@ -171,7 +171,8 @@ This is a characterization, with no pass/fail threshold. It uses the same patien
   * *Connectivity (12):* for 1–40, 4–8 and 13–30 Hz (causal 4th-order Butterworth filters, with 10 s of warm-up where the recording allows), the correlation matrix of the present derivations over each window gives four numbers. They are the mean absolute correlation, the largest eigenvalue as a fraction of the number of channels, the normalized entropy of the eigenvalues, and the mean absolute correlation between left-right homologous derivations.
   * *In total:* 88 EEG features, plus the time of day. Extracted with `scripts/extract_features.py --feature-set v2` into `data/processed/features_v2/`; the v1 features are unchanged.
 * **Personal baseline.** Each patient's EEG features (not the time of day) are scaled by the median and interquartile range of their own interictal windows (floor 0.001). For the test patient, only the fold's training interictal windows are used; other patients use all their interictal windows. It needs no seizures, so a device could learn it from its wearer's first days of normal EEG.
-* **Variants.** Other patients only, and other patients + this patient (half the weight), each with feature set v2 and each without and with the personal baseline: four results. Each is compared per patient with the same design using feature set v1 (Section 11.1), by Wilcoxon test and the number of patients where it is higher.
+* **Variants.** Other patients only, and other patients + this patient (half the weight), each with feature set v2 and each without and with the personal baseline: four results.
+* **Without the time of day (added in v1.8).** The lockbox audit (Section 12) found that SeizeIT2's EEG files all start at 00:00:00, so its clock times are anonymized and the design tested there can't use the time of day. The two personal-baseline variants are therefore also run without time-of-day features (`--no-clock`), so their performance on CHB-MIT and Siena is known before the design is frozen. Each is compared per patient with the same design using feature set v1 (Section 11.1), by Wilcoxon test and the number of patients where it is higher.
 * **Risks stated in advance:**
   * more features give the patient-specific part more room to overfit a few seizures;
   * scaling to a baseline may remove differences between states (for example sleep and wake) that carry information;
@@ -186,6 +187,13 @@ SeizeIT2 v1.1.0 (OpenNeuro ds005873, CC0 licence) was downloaded on 2026-09-28 i
 * file counts and sizes;
 * `dataset_description.json` and `CHANGES`, to confirm the version;
 * the blind feasibility audit (`scripts/audit_seizeit2.py`). It reads only file listings, EDF headers (channel names, sampling rates, durations and start times), and the column names and event categories of the annotation files. It reports seizure numbers only as totals across the whole dataset. Its report, `results/lockbox/seizeit2_feasibility.md`, is committed as a record of what was looked at.
+* since v1.8, the recording start times in the BIDS `scans.tsv` files and the gaps between consecutive EEG recordings. This is recording timing only, nothing about seizures, and it decides whether recordings can be placed on one timeline.
+
+**What the first audit found (2026-09-28).**
+
+* **Coverage:** 125 subjects and 11,009 EDF files, all readable. EEG is in 2,850 files (11,626 h) with behind-the-ear channels `BTEleft SD`, `BTEright SD` and `CROSStop SD`, plus ECG, EMG and movement recordings.
+* **Clock times:** every EEG file starts at 00:00:00.
+* **Seizures:** 883 in total; 97 subjects have at least two.
 
 **Not allowed before the design is frozen:** reading or plotting EEG samples, computing features, looking at any seizure timing or at any per-patient seizure information, or running any model on the data.
 
@@ -203,3 +211,4 @@ SeizeIT2 v1.1.0 (OpenNeuro ds005873, CC0 licence) was downloaded on 2026-09-28 i
 | 1.5 | 2026-09-27 | After the personalized variants (best: other patients + this patient, AUROC 0.698): added the alarm-level test of the personalized designs (Section 11.2), before running it |
 | 1.6 | 2026-09-27 | While the v1.5 test was running and before any v1.6 result: added feature set v2 and the personal baseline (Section 11.3) |
 | 1.7 | 2026-09-28 | Before any look at SeizeIT2 beyond file counts and the version files: added the lockbox rules and the blind feasibility audit (Section 12) |
+| 1.8 | 2026-09-28 | After the blind audit (anonymized SeizeIT2 clock times; 97 subjects with at least two seizures): added no-time-of-day versions of the personal-baseline variants (Section 11.3) and a recording-timing check to the audit (Section 12), before running either |

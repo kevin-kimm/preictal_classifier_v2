@@ -4,7 +4,9 @@ Checks that SeizeIT2 can be used, without looking at anything that could shape t
 design: it reads only file listings, EDF headers (channel names, sampling rates,
 durations, start times) and the column names and event categories of the annotation
 files. It never prints seizure timings, never reads EEG samples, and reports seizure
-numbers only as totals across the whole dataset.
+numbers only as totals across the whole dataset. Since v1.8 it also reads the recording
+start times in the BIDS scans.tsv files, to see whether consecutive recordings can be
+placed on one timeline (recording timing only; nothing about seizures).
 
 Usage, from the repo root with .venv active:
     python scripts/audit_seizeit2.py
@@ -97,6 +99,40 @@ def main():
                 subjects_with_sz[s] += 1
     n_two = sum(1 for c in subjects_with_sz.values() if c >= 2)
 
+    # recording timing (v1.8): scans.tsv start times and the gaps between consecutive EEG recordings
+    eeg_dur = {}
+    for p in edfs:
+        if modality(p) == "eeg":
+            try:
+                eeg_dur[p.name] = read_header(p).duration_s
+            except Exception:  # noqa: BLE001
+                pass
+    scans = sorted(p for p in files if p.name.endswith("_scans.tsv"))
+    scan_cols, gaps, midnight, n_times = Counter(), [], 0, 0
+    for p in scans:
+        with open(p, newline="") as fh:
+            rows = list(csv.DictReader(fh, delimiter="\t"))
+        if not rows:
+            continue
+        scan_cols[tuple(rows[0].keys())] += 1
+        if "acq_time" not in rows[0]:
+            continue
+        seq = []
+        for r in rows:
+            name = Path(r.get("filename", "")).name
+            if name not in eeg_dur:
+                continue
+            try:
+                at = datetime.fromisoformat(r["acq_time"].replace("Z", ""))
+            except ValueError:
+                continue
+            n_times += 1
+            midnight += at.hour == 0 and at.minute == 0 and at.second == 0
+            seq.append((at, eeg_dur[name]))
+        seq.sort()
+        for (a, d), (b, _) in zip(seq, seq[1:]):
+            gaps.append((b - a).total_seconds() - d)
+
     out = REPO / "results" / "lockbox"
     out.mkdir(parents=True, exist_ok=True)
     L = ["# SeizeIT2 blind feasibility audit", "",
@@ -128,7 +164,17 @@ def main():
           "- Column sets: " + "; ".join(f"{', '.join(k)} ({v} files)" for k, v in columns.most_common(3)),
           "- Event categories: " + "; ".join(f"{k or '(blank)'} ({v})" for k, v in categories.most_common(15)),
           f"- Seizure events in total: {seizure_rows}; subjects with at least one: {len(subjects_with_sz)}; "
-          f"with at least two (needed for the patient-specific design): {n_two}"]
+          f"with at least two (needed for the patient-specific design): {n_two}",
+          "", "## Recording timing (v1.8; recording start times only)", "",
+          f"- scans.tsv files: {len(scans)}; column sets: "
+          + "; ".join(f"{', '.join(k)} ({v})" for k, v in scan_cols.most_common(3)),
+          f"- EEG recordings with an acq_time: {n_times}; of those at exactly midnight: {midnight}"]
+    if gaps:
+        g = sorted(gaps)
+        within = sum(abs(x) <= 60 for x in g)
+        L += [f"- Gaps between consecutive EEG recordings in a session (next start minus previous end): "
+              f"{len(g)} gaps, median {g[len(g) // 2]:.0f} s, within ±60 s: {within} ({100 * within / len(g):.0f}%), "
+              f"negative (overlap > 60 s): {sum(x < -60 for x in g)}, longer than 1 h: {sum(x > 3600 for x in g)}"]
     if bad:
         L += ["", "## Unreadable files", ""] + [f"- {b}" for b in bad[:50]]
     (out / "seizeit2_feasibility.md").write_text("\n".join(L) + "\n")
@@ -139,6 +185,11 @@ def main():
         print(f"  {mod}: {n_ok[mod]} files, {hours[mod]:.0f} h, channels {', '.join(list(labels[mod])[:6])}")
     print(f"EEG files starting at 00:00:00: {times['00:00:00']} of {sum(times.values())}")
     print(f"Seizure events (total): {seizure_rows}; subjects with >= 2: {n_two}")
+    print(f"scans.tsv files: {len(scans)}; EEG recordings with acq_time: {n_times} (at midnight: {midnight})")
+    if gaps:
+        g = sorted(gaps)
+        print(f"Gaps between consecutive EEG recordings: median {g[len(g) // 2]:.0f} s, "
+              f"within ±60 s {100 * sum(abs(x) <= 60 for x in g) / len(g):.0f}%")
     print(f"Report: {out / 'seizeit2_feasibility.md'}")
 
 
