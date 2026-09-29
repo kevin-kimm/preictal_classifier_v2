@@ -47,6 +47,10 @@ CONNECTIVITY_BANDS = {"broad": (1.0, 40.0), "theta": (4.0, 8.0), "beta": (13.0, 
 CONNECTIVITY_STATS = ("mean_abs_corr", "lambda1_fraction", "eigen_entropy", "homologous_abs_corr")
 CONNECTIVITY_FEATURES = [f"{b}_{s}" for b in CONNECTIVITY_BANDS for s in CONNECTIVITY_STATS]
 FEATURE_VERSION_V2 = "d2-v2"
+# Known issue, kept on purpose (evaluation methods v1.14, erratum): the two frontopolar pairs are
+# written "FP1"/"FP2" while derivation names use "Fp1"/"Fp2", so they never match and the homologous
+# correlation uses the other 6 pairs. The frozen design was developed and evaluated this way, so it is
+# not changed; tests/test_features.py pins this behaviour so development and lockbox runs stay identical.
 HOMOLOGOUS = [("FP1-F7", "FP2-F8"), ("F7-T7", "F8-T8"), ("T7-P7", "T8-P8"), ("P7-O1", "P8-O2"),
               ("FP1-F3", "FP2-F4"), ("F3-C3", "F4-C4"), ("C3-P3", "C4-P4"), ("P3-O1", "P4-O2")]
 EPS = 1e-12

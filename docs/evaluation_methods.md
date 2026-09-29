@@ -2,7 +2,7 @@
 
 | Doc | Version | Author | Written |
 |---|---|---|---|
-| EVM-001 | 1.13 | Kevin Kim | v1.0 before any model was trained; v1.1 and v1.2 after D1, before any D2 result; v1.3 after a one-seed D2 preview; v1.4 after the full D2 run; v1.5 after the personalized variants; v1.6 while the v1.5 test was running, before any v1.6 result; v1.7 before the lockbox audit; v1.8 and v1.9 after it; v1.10 before the final development round; v1.11 before splitting SeizeIT2; v1.12 during the final development round; v1.13 freezes the design (see Section 13) |
+| EVM-001 | 1.14 | Kevin Kim | v1.0 before any model was trained; v1.1 and v1.2 after D1, before any D2 result; v1.3 after a one-seed D2 preview; v1.4 after the full D2 run; v1.5 after the personalized variants; v1.6 while the v1.5 test was running, before any v1.6 result; v1.7 before the lockbox audit; v1.8 and v1.9 after it; v1.10 before the final development round; v1.11 before splitting SeizeIT2; v1.12 during the final development round; v1.13 freezes the design; v1.14 is an erratum (see Section 13) |
 
 This document fixes how models are trained, tuned and scored for Deliverables 1 and 2. It adds detail to the verification plan (tag `vtp-1.0`) and doesn't change any of its pass/fail criteria. It is committed before any model is trained so the Git history shows these choices came first. Anything changed after results are seen goes in the version history (Section 11) with a reason.
 
@@ -245,6 +245,8 @@ Only the 10 min context is at least 0.01 above the base, so there is no combinat
 3. **SeizeIT2 adapter,** built and checked on the 25 development patients, including how many seizures have their preictal period inside their own file.
 4. **The lockbox run,** once, on the 100 lockbox patients.
 
+**Erratum (v1.14, 2026-09-30).** While writing a plotting script after the freeze, it turned out that the list of left-right homologous pairs in feature set v2 spells the frontopolar derivations "FP1"/"FP2", while the derivation names are "Fp1"/"Fp2". Those two pairs (Fp1-F7/Fp2-F8 and Fp1-F3/Fp2-F4) never matched. So the homologous-correlation connectivity feature (1 of the 4 connectivity measures, in each of the 3 bands) was computed from the other 6 pairs, in every v2 result. The frozen design is kept exactly as it was developed and evaluated, so the lockbox runs the same code. The behaviour is documented in the code and pinned by a test. For SeizeIT2, the homologous pair is specified separately (`BTEleft SD` with `BTEright SD`) and is unaffected.
+
 ## 12. Lockbox: SeizeIT2 (added in v1.7)
 
 SeizeIT2 v1.1.0 (OpenNeuro ds005873, CC0 licence) was downloaded on 2026-09-28 into `data/raw/seizeit2_v1.1.0/`: 24,877 files, 117.2 GiB. It has 125 patients with focal epilepsy, behind-the-ear EEG and other wearable signals. It is kept sealed until the final design is frozen, so it can give one unbiased test of that design.
@@ -291,3 +293,4 @@ SeizeIT2 v1.1.0 (OpenNeuro ds005873, CC0 licence) was downloaded on 2026-09-28 i
 | 1.11 | 2026-09-29 | Before splitting SeizeIT2: 25 development and 100 lockbox patients, drawn once from subject IDs with seed 0 (Section 12) |
 | 1.12 | 2026-09-29 | During the final development round, after challengers 1–3 and before 4 and 5: added challenger 5 (training with a 1 h gap, testing with 4 h) and the combination step (Section 11.4) |
 | 1.13 | 2026-09-30 | Final development round complete (challenger 5: 0.684): design frozen as the base design with 10 min context (Section 11.5), including how it is applied to SeizeIT2, and the remaining steps in order |
+| 1.14 | 2026-09-30 | Erratum: the frontopolar homologous pairs never matched, so the homologous correlation used 6 of 8 pairs; kept as frozen (Section 11.5) |

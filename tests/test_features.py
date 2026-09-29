@@ -162,3 +162,11 @@ def test_v2_features_do_not_depend_on_chunking(tmp_path):
     assert np.allclose(f1, f2, rtol=1e-4, atol=1e-4, equal_nan=True)
     late = starts >= 10                                 # after the filter warm-up
     assert np.allclose(c1[late], c2[late], atol=0.02)
+
+
+def test_homologous_pairs_as_frozen():
+    """Pins the frozen behaviour: 6 of the 8 listed pairs match derivation names (erratum, v1.14)."""
+    from preictal.features.build_features import HOMOLOGOUS
+    matched = [p for p in HOMOLOGOUS if p[0] in DERIVATIONS and p[1] in DERIVATIONS]
+    assert len(matched) == 6
+    assert all(not a.startswith("FP") for a, _ in matched)
