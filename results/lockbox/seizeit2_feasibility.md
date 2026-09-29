@@ -1,6 +1,6 @@
 # SeizeIT2 blind feasibility audit
 
-Generated 2026-09-28T08:29:27 with `scripts/audit_seizeit2.py`. Only file listings, EDF headers and annotation column names and categories were read. No EEG samples were read, no seizure timings were looked at, and seizure numbers are totals across the whole dataset (docs/evaluation_methods.md v1.7, Section 12).
+Generated 2026-09-29T09:45:28 with `scripts/audit_seizeit2.py`. Only file listings, EDF headers and annotation column names and categories were read. No EEG samples were read, no seizure timings were looked at, and seizure numbers are totals across the whole dataset (docs/evaluation_methods.md v1.7, Section 12).
 
 ## Files
 
@@ -33,3 +33,10 @@ Generated 2026-09-28T08:29:27 with `scripts/audit_seizeit2.py`. Only file listin
 
 - scans.tsv files: 0; column sets: 
 - EEG recordings with an acq_time: 0; of those at exactly midnight: 0
+
+## Recording timing from the annotation files (v1.9; recording start times only)
+
+- Annotation files with one dateTime for every row (a recording start): 2850; with differing dateTimes (event-level, not used): 0
+- Of the recording starts, at exactly midnight: 2850
+- recordingDuration matches the EDF duration within 2 s: 2850 of 2850
+- Gaps between consecutive recordings in a session (next start minus previous end): 2725 gaps, median -3567 s, within ±60 s: 0 (0%), overlaps over 60 s: 2725, gaps over 1 h: 0
