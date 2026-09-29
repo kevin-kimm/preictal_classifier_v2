@@ -17,8 +17,14 @@ Variants: general (other patients only), general_personal (other patients + this
 patient, half the weight), ps_eeg_ctx_clock (this patient only, with context and time
 of day). Targets: at most 5 and at most 1 false alarms per 24 h.
 
+Frozen design (evaluation methods v1.13, Section 11.5):
+    --frozen      other patients + this patient (and other patients only, for comparison) with
+                  feature set v2, 10 min context, the personal baseline and no time of day. Every
+                  model's personal baseline comes from its own training windows only.
+
 Usage, from the repo root with .venv active:
     python scripts/run_personalized_alarms.py                  all variants, five seeds (about 4 h)
+    python scripts/run_personalized_alarms.py --frozen         the frozen design
     python scripts/run_personalized_alarms.py --seeds 0        quicker look
 
 Outputs: results/d2/personalized_alarms.md and personalized_alarms.csv
@@ -47,7 +53,7 @@ from preictal.evaluation.metrics import (  # noqa: E402
     AlarmResult, Sequence, chance_p_value, choose_threshold_bisect, evaluate_all,
 )
 from preictal.evaluation.patient_specific import inner_interictal_folds, patient_folds  # noqa: E402
-from preictal.features.build_features import feature_version  # noqa: E402
+from preictal.features.build_features import FEATURE_VERSION, FEATURE_VERSION_V2, feature_version  # noqa: E402
 from preictal.features.transforms import cache_key, clock_features, context_features, timeline_has_clock  # noqa: E402
 from preictal.models.model import build_model, predict_proba  # noqa: E402
 from preictal.models.train import TRAIN_CLASSES, blend_weights, load_windows, sample_weights  # noqa: E402
@@ -77,10 +83,18 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--seeds", type=int, nargs="+", default=None)
     ap.add_argument("--variants", nargs="+", default=list(VARIANTS), choices=VARIANTS)
-    ap.add_argument("--features", type=Path, default=REPO / "data" / "processed" / "features")
+    ap.add_argument("--features", type=Path, default=None)
     ap.add_argument("--out", type=Path, default=REPO / "results" / "d2")
+    ap.add_argument("--frozen", action="store_true")
     args = ap.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
+    if args.frozen:
+        args.variants = [v for v in args.variants if v in ("general", "general_personal")]
+        LABELS.update({"general": "Other patients only (frozen design's features and baseline)",
+                       "general_personal": "Frozen design: other patients + this patient"})
+    if args.features is None:
+        args.features = REPO / "data" / "processed" / ("features_v2" if args.frozen else "features")
+    tag = "_frozen" if args.frozen else ""
 
     cfg = load_config()
     rules = LabelRules.from_config(cfg)
@@ -88,7 +102,7 @@ def main():
     step_s = cfg["windows"]["step_s"]
     datasets = tuple(cfg["training"]["datasets"])
     corrections = DEFAULT_CORRECTIONS.read_text() if DEFAULT_CORRECTIONS.exists() else ""
-    version = feature_version(cfg, corrections)
+    version = feature_version(cfg, corrections, FEATURE_VERSION_V2 if args.frozen else FEATURE_VERSION)
     subjects = read_label_report(REPO / "results" / "d1" / "label_report.csv")
     tl_info = json.loads((args.features / "timelines.json").read_text())
     kw = dict(sph_s=rules.sph_s, horizon_s=rules.preictal_start_s,
@@ -111,6 +125,31 @@ def main():
             np.save(cache, ctx)
         X_ctx_clock = np.hstack([W.X, ctx, clock])
     feats = {"general": X_clock, "general_personal": X_clock, "ps_eeg_ctx_clock": X_ctx_clock}
+
+    def scale(M, ref):
+        """Personal baseline: each column minus ref's median, over ref's interquartile range (floor 0.001)."""
+        with np.errstate(all="ignore"):
+            med = np.nanmedian(ref, axis=0)
+            iqr = np.maximum(np.nanpercentile(ref, 75, axis=0) - np.nanpercentile(ref, 25, axis=0), 1e-3)
+        return (M - med) / iqr
+
+    scaled_all = None
+    if args.frozen:                     # feature set v2 + 10 min context, no time of day
+        cache = args.features.parent / "d2_cache" / f"train_ctx10r_{version}_{cache_key(W)}.npy"
+        if cache.exists():
+            ctx = np.load(cache)
+        else:
+            print("  computing 10 min context features (one-off, cached)...")
+            ctx = context_features(W.X, W.timeline, W.t_end, 600)
+            cache.parent.mkdir(parents=True, exist_ok=True)
+            np.save(cache, ctx)
+        Xf = np.hstack([W.X, ctx])
+        feats = {"general": Xf, "general_personal": Xf}
+        scaled_all = np.empty_like(Xf)
+        for code in range(len(W.subjects)):     # other patients: scaled by all their own interictal windows
+            r = np.flatnonzero(W.subject == code)
+            ref = r[W.y[r] == INTERICTAL]
+            scaled_all[r] = scale(Xf[r], Xf[ref]) if len(ref) else Xf[r]
 
     patients = []
     for code, subject in enumerate(W.subjects):
@@ -148,7 +187,8 @@ def main():
         for seed in seeds:
             general = None
             if "general" in args.variants:
-                general = fit(X_clock[others], W.y[others], sample_weights(W.y[others], W.subject[others]), seed)
+                Xo = scaled_all[others] if args.frozen else X_clock[others]
+                general = fit(Xo, W.y[others], sample_weights(W.y[others], W.subject[others]), seed)
             totals = {(v, tg): AlarmResult() for v in args.variants for tg in TARGETS}
             for i, train, test in folds:
                 tl_e, onset = events_sorted[i]
@@ -156,25 +196,36 @@ def main():
                                              & (t <= onset - rules.sph_s))
                 chunk = test[y[test] == INTERICTAL]
 
-                def train_model(v, rel):
+                def patient_X(v, ref_rel):
+                    """This patient's rows; with --frozen, scaled by the interictal windows among ref_rel."""
+                    M = feats[v][rows]
+                    if not args.frozen:
+                        return M
+                    ref = ref_rel[y[ref_rel] == INTERICTAL]
+                    return scale(M, M[ref])
+
+                others_X = scaled_all[others] if args.frozen else None
+
+                def train_model(v, rel, P):
                     rel = rel[np.isin(y[rel], TRAIN_CLASSES)]
-                    X = feats[v]
                     if v == "general_personal":
+                        Xo = others_X if args.frozen else feats[v][others]
                         wg, wp = blend_weights(W.y[others], W.subject[others], y[rel], 0.5)
-                        return fit(np.vstack([X[others], X[rows[rel]]]), np.concatenate([W.y[others], y[rel]]),
+                        return fit(np.vstack([Xo, P[rel]]), np.concatenate([W.y[others], y[rel]]),
                                    np.concatenate([wg, wp]), seed)
-                    return fit(X[rows[rel]], y[rel], sample_weights(y[rel], np.zeros(len(rel), int)), seed)
+                    return fit(P[rel], y[rel], sample_weights(y[rel], np.zeros(len(rel), int)), seed)
 
                 for v in args.variants:
-                    X = feats[v]
                     # threshold from the training data only
                     inner_seqs = []
                     for inner_train, inner_chunk in inner_interictal_folds(t, y, tl, train):
-                        m = general if v == "general" else train_model(v, inner_train)
-                        inner_seqs += seqs_for(inner_chunk, predict_proba(m, X[rows[inner_chunk]])[:, 0], t, y, tl)
-                    model = general if v == "general" else train_model(v, train)
-                    pre = seqs_for(pre_seq_rel, predict_proba(model, X[rows[pre_seq_rel]])[:, 0], t, y, tl, [onset])
-                    inter = seqs_for(chunk, predict_proba(model, X[rows[chunk]])[:, 0], t, y, tl)
+                        P_in = patient_X(v, inner_train)
+                        m = general if v == "general" else train_model(v, inner_train, P_in)
+                        inner_seqs += seqs_for(inner_chunk, predict_proba(m, P_in[inner_chunk])[:, 0], t, y, tl)
+                    P = patient_X(v, train)
+                    model = general if v == "general" else train_model(v, train, P)
+                    pre = seqs_for(pre_seq_rel, predict_proba(model, P[pre_seq_rel])[:, 0], t, y, tl, [onset])
+                    inter = seqs_for(chunk, predict_proba(model, P[chunk])[:, 0], t, y, tl)
                     for tg in TARGETS:
                         thr, _ = choose_threshold_bisect(inner_seqs, tg, step_s, n_cand, **kw)
                         warned = evaluate_all(pre, thr, step_s, **kw)
@@ -191,7 +242,7 @@ def main():
                                      "median_warning_min": (np.median(r.warning_times) / 60 if r.warning_times
                                                             else float("nan"))})
 
-    with open(args.out / "personalized_alarms.csv", "w", newline="") as fh:
+    with open(args.out / f"personalized_alarms{tag}.csv", "w", newline="") as fh:
         wtr = csv.DictWriter(fh, fieldnames=list(rows_out[0]), lineterminator="\n")
         wtr.writeheader()
         wtr.writerows(rows_out)
@@ -238,12 +289,12 @@ def main():
             cells.append(f"{np.mean([r['warned'] for r in rs]):.1f}/{rs[0]['seizures']} · "
                          f"{np.mean([r['far_per_24h'] for r in rs]):.1f}")
         lines.append(f"| {s} | {per[s][args.variants[0]][0]['seizures']} | " + " | ".join(cells) + " |")
-    (args.out / "personalized_alarms.md").write_text("\n".join(lines) + "\n")
+    (args.out / f"personalized_alarms{tag}.md").write_text("\n".join(lines) + "\n")
 
     print()
     for x in printed:
         print(x)
-    print(f"Report: {args.out / 'personalized_alarms.md'}")
+    print(f"Report: {args.out / f'personalized_alarms{tag}.md'}")
 
 
 if __name__ == "__main__":

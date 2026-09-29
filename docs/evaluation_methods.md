@@ -2,7 +2,7 @@
 
 | Doc | Version | Author | Written |
 |---|---|---|---|
-| EVM-001 | 1.12 | Kevin Kim | v1.0 before any model was trained; v1.1 and v1.2 after D1, before any D2 result; v1.3 after a one-seed D2 preview; v1.4 after the full D2 run; v1.5 after the personalized variants; v1.6 while the v1.5 test was running, before any v1.6 result; v1.7 before the lockbox audit; v1.8 and v1.9 after it; v1.10 before the final development round; v1.11 before splitting SeizeIT2; v1.12 during the final development round (see Section 13) |
+| EVM-001 | 1.13 | Kevin Kim | v1.0 before any model was trained; v1.1 and v1.2 after D1, before any D2 result; v1.3 after a one-seed D2 preview; v1.4 after the full D2 run; v1.5 after the personalized variants; v1.6 while the v1.5 test was running, before any v1.6 result; v1.7 before the lockbox audit; v1.8 and v1.9 after it; v1.10 before the final development round; v1.11 before splitting SeizeIT2; v1.12 during the final development round; v1.13 freezes the design (see Section 13) |
 
 This document fixes how models are trained, tuned and scored for Deliverables 1 and 2. It adds detail to the verification plan (tag `vtp-1.0`) and doesn't change any of its pass/fail criteria. It is committed before any model is trained so the Git history shows these choices came first. Anything changed after results are seen goes in the version history (Section 11) with a reason.
 
@@ -193,6 +193,58 @@ CHB-MIT and Siena now serve as the development set and SeizeIT2 as the sealed te
 * **Challenger 5 (added in v1.12): training with a 1-hour gap.** This is the base design with every training window labeled using a 1 h interictal gap instead of 4 h (`--train-gap-h 1`), so EEG 1–4 h from a seizure is used as normal for training. That covers the patient's and the other patients' training windows, and the windows used for the personal baseline. Testing is unchanged: the held-out interictal chunks are the 4 h interictal windows, nothing within 4 h of the held-out seizure is trained on, and the same 22 patients are tested. The aim is more training data, especially from Siena, without making the test easier.
 * **Combination step (v1.12).** If two or more challengers qualify, the two best are combined in one more run, and the design frozen is the highest-scoring among the qualifying challengers and that combination. This step was added after challengers 1–3 were seen (10 min context 0.700 qualifies; 30 min context 0.654 and personal share 0.75 at 0.688 don't), and before the results of challengers 4 and 5.
 
+### 11.5 Frozen design (v1.13, 2026-09-30)
+
+**Selection.** The rule in Section 11.4 was applied to the final development round (base design 0.681):
+
+| Challenger | Mean AUROC | Beat the base in |
+|---|---|---|
+| 10 min context | 0.700 | 11 of 22 |
+| 30 min context | 0.654 | 12 of 22 |
+| personal share 0.75 | 0.688 | 15 of 22 |
+| more cautious trees | 0.677 | 11 of 22 |
+| trained with a 1 h gap | 0.684 | 11 of 22 |
+
+Only the 10 min context is at least 0.01 above the base, so there is no combination step. The frozen design is the base design with 10 min context. Its development score, AUROC 0.700 (95% CI 0.630–0.768) on 22 patients, is optimistic, because it was chosen on those patients. It improved only 11 of 22 patients, so the gain may not hold on new data.
+
+**The frozen design.** Nothing below may change after this point.
+
+* **Labels:** as in the verification plan.
+  * *Before seizure:* 30 min to 5 s before onset.
+  * *Normal:* at least 4 h from any seizure.
+  * *Seizure grouping:* seizures less than 30 min apart form one event.
+  * *Eligibility:* an event is eligible if at least 90% of its preictal period is recorded.
+  * *Windows:* 30 s long, every 5 s.
+* **Features:** feature set v2 (Section 11.3: 76 pooled per-derivation features and 12 connectivity features), plus the mean and slope over the preceding 10 min of each (Section 10), giving 264 columns. No time of day.
+* **Personal baseline:** every column minus its median, divided by its interquartile range (floor 0.001), over reference windows. For the person being predicted, the references are their own interictal training windows; each model uses only the windows it was trained on. For other patients, the references are all their interictal windows.
+* **Model:** scikit-learn `HistGradientBoostingClassifier` with default settings and `random_state` equal to the seed. Three classes; the risk is the probability of preictal.
+* **Training data:**
+  * *Other patients:* their preictal, ictal and interictal windows, taken 30 s apart, weighted as in D1 (each class equal, each patient equal within a class).
+  * *The person:* their own training windows, which carry half of each class's weight.
+* **Alarms:**
+  * *Rules:* the risk averaged over 36 windows (3 min), above threshold for 6 windows in a row (30 s), then a 30 min refractory period.
+  * *Threshold:* the lowest of 1,000 candidates (binary search) whose false alarm rate is at most the target (5 and 1 per 24 h). It is measured on out-of-sample scores of the person's own training interictal windows: 3 chunks, each scored by a model trained without it and with a 5 min gap around it.
+* **Personalized evaluation (Section 11):**
+  * *Folds:* leave one eligible seizure out at a time; the test is that seizure's preictal windows and one of n interictal chunks.
+  * *Buffers:* nothing within 4 h of the held-out seizure, or within 5 min of the held-out chunk, is used for training.
+  * *Patients:* those with at least 2 eligible seizures and at least 1 h of interictal windows.
+  * *Seeds:* 0 to 4.
+
+**Applying it to SeizeIT2 (the lockbox).**
+
+* **Channels:** the behind-the-ear EEG channels present (`BTEleft SD`, `BTEright SD`, `CROSStop SD`), resampled from 250 to 256 Hz, are the "derivations". Features are pooled over the channels present. For connectivity, `BTEleft SD` and `BTEright SD` form the left-right homologous pair when both are present.
+* **Seizures:** annotation rows whose `eventType` starts with `sz` are seizures (onset and duration from the file). Other rows are ignored.
+* **Timeline:** clock times are anonymized, so each patient's files are placed back to back in run-number order. Distances used for the 4 h normal-EEG rule are measured on this timeline; real breaks between files can only make true distances longer, so normal EEG stays at least 4 h from any seizure. Preictal windows come only from the same file as their seizure, and the 90% rule is applied within that file.
+* **Other patients** for the general part are all other SeizeIT2 patients (development and lockbox), never the test patient. Everything else is as above.
+* **What may still change:** only technical adapter code (loading, channel mapping, the timeline rule above), written and checked on the 25 development patients. The design does not change, and lockbox data is not used before the lockbox run.
+
+**Planned next, in this order:**
+
+1. **Alarm-level test of the frozen design on CHB-MIT and Siena** (`scripts/run_personalized_alarms.py --frozen`), with the same folds and targets as Section 11.2. It uses seeds 0 and 1 only, because each seed takes several hours with 264 features and the seed changes little (D2's spread across seeds was ±0.007).
+2. **1 h sensitivity analysis** on CHB-MIT and Siena: the frozen design with every label, for training and testing, using a 1 h gap, on the patients eligible under that definition.
+3. **SeizeIT2 adapter,** built and checked on the 25 development patients, including how many seizures have their preictal period inside their own file.
+4. **The lockbox run,** once, on the 100 lockbox patients.
+
 ## 12. Lockbox: SeizeIT2 (added in v1.7)
 
 SeizeIT2 v1.1.0 (OpenNeuro ds005873, CC0 licence) was downloaded on 2026-09-28 into `data/raw/seizeit2_v1.1.0/`: 24,877 files, 117.2 GiB. It has 125 patients with focal epilepsy, behind-the-ear EEG and other wearable signals. It is kept sealed until the final design is frozen, so it can give one unbiased test of that design.
@@ -238,3 +290,4 @@ SeizeIT2 v1.1.0 (OpenNeuro ds005873, CC0 licence) was downloaded on 2026-09-28 i
 | 1.10 | 2026-09-29 | After the v1.6 and v1.8 results (best no-clock design 0.681): added the final development round and its selection rule (Section 11.4), before running it |
 | 1.11 | 2026-09-29 | Before splitting SeizeIT2: 25 development and 100 lockbox patients, drawn once from subject IDs with seed 0 (Section 12) |
 | 1.12 | 2026-09-29 | During the final development round, after challengers 1–3 and before 4 and 5: added challenger 5 (training with a 1 h gap, testing with 4 h) and the combination step (Section 11.4) |
+| 1.13 | 2026-09-30 | Final development round complete (challenger 5: 0.684): design frozen as the base design with 10 min context (Section 11.5), including how it is applied to SeizeIT2, and the remaining steps in order |
