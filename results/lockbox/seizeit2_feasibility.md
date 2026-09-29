@@ -1,6 +1,6 @@
 # SeizeIT2 blind feasibility audit
 
-Generated 2026-09-29T09:45:28 with `scripts/audit_seizeit2.py`. Only file listings, EDF headers and annotation column names and categories were read. No EEG samples were read, no seizure timings were looked at, and seizure numbers are totals across the whole dataset (docs/evaluation_methods.md v1.7, Section 12).
+Generated 2026-09-29T10:00:58 with `scripts/audit_seizeit2.py`. Only file listings, EDF headers and annotation column names and categories were read. No EEG samples were read, no seizure timings were looked at, and seizure numbers are totals across the whole dataset (docs/evaluation_methods.md v1.7, Section 12).
 
 ## Files
 
