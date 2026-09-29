@@ -6,7 +6,10 @@ durations, start times) and the column names and event categories of the annotat
 files. It never prints seizure timings, never reads EEG samples, and reports seizure
 numbers only as totals across the whole dataset. Since v1.8 it also reads the recording
 start times in the BIDS scans.tsv files, to see whether consecutive recordings can be
-placed on one timeline (recording timing only; nothing about seizures).
+placed on one timeline (recording timing only; nothing about seizures). Since v1.9 it
+also reads the dateTime and recordingDuration columns of the annotation files. It uses them
+only if every row of a file carries the same dateTime (so it's the recording's start, not an
+event's), and it reports only totals and the gaps between consecutive recordings.
 
 Usage, from the repo root with .venv active:
     python scripts/audit_seizeit2.py
@@ -100,11 +103,13 @@ def main():
     n_two = sum(1 for c in subjects_with_sz.values() if c >= 2)
 
     # recording timing (v1.8): scans.tsv start times and the gaps between consecutive EEG recordings
-    eeg_dur = {}
+    eeg_dur, eeg_dur_by_stem = {}, {}
     for p in edfs:
         if modality(p) == "eeg":
             try:
                 eeg_dur[p.name] = read_header(p).duration_s
+                eeg_dur_by_stem[p.name[:-len("_eeg.edf")] if p.name.endswith("_eeg.edf") else p.stem] = (
+                    eeg_dur[p.name], p)
             except Exception:  # noqa: BLE001
                 pass
     scans = sorted(p for p in files if p.name.endswith("_scans.tsv"))
@@ -132,6 +137,44 @@ def main():
         seq.sort()
         for (a, d), (b, _) in zip(seq, seq[1:]):
             gaps.append((b - a).total_seconds() - d)
+
+    # recording timing (v1.9): dateTime / recordingDuration in the annotation files
+    ev_single, ev_multi, ev_midnight, dur_agree, dur_checked = 0, 0, 0, 0, 0
+    starts_by_session = defaultdict(list)
+    for p in tsvs:
+        with open(p, newline="") as fh:
+            rows = list(csv.DictReader(fh, delimiter="\t"))
+        if not rows or "dateTime" not in rows[0]:
+            continue
+        values = {(r.get("dateTime") or "").strip() for r in rows}
+        if len(values) != 1:
+            ev_multi += 1                      # event-level times: not used, not printed
+            continue
+        try:
+            start = datetime.fromisoformat(values.pop().replace("Z", ""))
+        except ValueError:
+            ev_multi += 1
+            continue
+        ev_single += 1
+        ev_midnight += start.hour == 0 and start.minute == 0 and start.second == 0
+        stem = p.name[:-len("_events.tsv")]
+        dur = eeg_dur_by_stem.get(stem, (None, None))[0]
+        try:
+            rec_dur = float(rows[0].get("recordingDuration") or "nan")
+        except ValueError:
+            rec_dur = float("nan")
+        if dur is not None and rec_dur == rec_dur:
+            dur_checked += 1
+            dur_agree += abs(rec_dur - dur) <= 2
+        length = dur if dur is not None else rec_dur
+        m1, m2 = re.search(r"sub-[A-Za-z0-9]+", str(p)), re.search(r"ses-[A-Za-z0-9]+", str(p))
+        starts_by_session[(m1.group(0) if m1 else "", m2.group(0) if m2 else "")].append((start, length))
+    ev_gaps = []
+    for seq in starts_by_session.values():
+        seq.sort()
+        for (a, d), (b, _) in zip(seq, seq[1:]):
+            if d == d:
+                ev_gaps.append((b - a).total_seconds() - d)
 
     out = REPO / "results" / "lockbox"
     out.mkdir(parents=True, exist_ok=True)
@@ -169,6 +212,17 @@ def main():
           f"- scans.tsv files: {len(scans)}; column sets: "
           + "; ".join(f"{', '.join(k)} ({v})" for k, v in scan_cols.most_common(3)),
           f"- EEG recordings with an acq_time: {n_times}; of those at exactly midnight: {midnight}"]
+    L += ["", "## Recording timing from the annotation files (v1.9; recording start times only)", "",
+          f"- Annotation files with one dateTime for every row (a recording start): {ev_single}; "
+          f"with differing dateTimes (event-level, not used): {ev_multi}",
+          f"- Of the recording starts, at exactly midnight: {ev_midnight}",
+          f"- recordingDuration matches the EDF duration within 2 s: {dur_agree} of {dur_checked}"]
+    if ev_gaps:
+        g = sorted(ev_gaps)
+        within = sum(abs(x) <= 60 for x in g)
+        L += [f"- Gaps between consecutive recordings in a session (next start minus previous end): {len(g)} gaps, "
+              f"median {g[len(g) // 2]:.0f} s, within ±60 s: {within} ({100 * within / len(g):.0f}%), "
+              f"overlaps over 60 s: {sum(x < -60 for x in g)}, gaps over 1 h: {sum(x > 3600 for x in g)}"]
     if gaps:
         g = sorted(gaps)
         within = sum(abs(x) <= 60 for x in g)
@@ -190,6 +244,13 @@ def main():
         g = sorted(gaps)
         print(f"Gaps between consecutive EEG recordings: median {g[len(g) // 2]:.0f} s, "
               f"within ±60 s {100 * sum(abs(x) <= 60 for x in g) / len(g):.0f}%")
+    print(f"Annotation dateTime: {ev_single} files with one recording start, {ev_multi} with event-level times; "
+          f"at midnight: {ev_midnight}; recordingDuration matches EDF: {dur_agree}/{dur_checked}")
+    if ev_gaps:
+        g = sorted(ev_gaps)
+        print(f"Gaps between consecutive recordings: {len(g)} gaps, median {g[len(g) // 2]:.0f} s, "
+              f"within ±60 s {100 * sum(abs(x) <= 60 for x in g) / len(g):.0f}%, "
+              f"overlaps > 60 s {sum(x < -60 for x in g)}, gaps > 1 h {sum(x > 3600 for x in g)}")
     print(f"Report: {out / 'seizeit2_feasibility.md'}")
 
 
