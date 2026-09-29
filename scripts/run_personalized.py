@@ -27,6 +27,8 @@ Final development round (evaluation methods v1.10, Section 11.4):
     --cautious-trees        gradient boosting with larger leaves, fewer leaves per tree and L2 regularization
     --compare-to FILE       results/d2 file to compare with (default personalized.csv) ...
     --compare-label TEXT    ... and how to label it
+    --train-gap-h H         train with an interictal gap of H hours (evaluation methods v1.12); test
+                            windows keep the frozen 4 h gap
 
 Usage, from the repo root with .venv active:
     python scripts/run_personalized.py                   all variants, five seeds (about 2 h)
@@ -53,7 +55,10 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "src"))
 
 from preictal.config import load_config  # noqa: E402
-from preictal.data.labels import INTERICTAL, PREICTAL, LabelRules  # noqa: E402
+from dataclasses import replace  # noqa: E402
+
+from preictal.data.labels import INTERICTAL, PREICTAL, LabelRules, build_timelines  # noqa: E402
+from preictal.data.loaders import discover  # noqa: E402
 from preictal.data.loaders import DEFAULT_CORRECTIONS  # noqa: E402
 from preictal.evaluation.lopo import read_label_report  # noqa: E402
 from preictal.evaluation.metrics import bootstrap_ci  # noqa: E402
@@ -61,7 +66,7 @@ from preictal.evaluation.patient_specific import patient_folds  # noqa: E402
 from preictal.features.build_features import FEATURE_VERSION, FEATURE_VERSION_V2, feature_version  # noqa: E402
 from preictal.features.transforms import cache_key, clock_features, context_features, timeline_has_clock  # noqa: E402
 from preictal.models.model import build_model, predict_proba  # noqa: E402
-from preictal.models.train import TRAIN_CLASSES, blend_weights, load_windows, sample_weights  # noqa: E402
+from preictal.models.train import TRAIN_CLASSES, blend_weights, load_windows, relabel, sample_weights  # noqa: E402
 
 try:
     from tqdm import tqdm
@@ -111,6 +116,7 @@ def main():
     ap.add_argument("--cautious-trees", action="store_true")
     ap.add_argument("--compare-to", default="personalized.csv")
     ap.add_argument("--compare-label", default="feature set v1 with time of day, no baseline")
+    ap.add_argument("--train-gap-h", type=float, default=None)
     ap.add_argument("--out", type=Path, default=REPO / "results" / "d2")
     args = ap.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
@@ -132,6 +138,14 @@ def main():
     print("Loading features...")
     W = load_windows(args.features, datasets, version=version, keep_per_channel=False)
     clock = clock_features(W.t_end, np.array([timeline_has_clock(k) for k in W.timelines])[W.timeline])
+    Ytr = W.y                                  # labels used for training (test labels always W.y)
+    if args.train_gap_h is not None:
+        train_rules = replace(rules, interictal_gap_s=args.train_gap_h * 3600.0)
+        print(f"  relabeling training windows with a {args.train_gap_h:g} h interictal gap...")
+        tls = build_timelines(discover(REPO / "data" / "raw", datasets=datasets), train_rules)
+        Ytr = relabel(W, tls, train_rules, cfg["windows"]["length_s"], step_s)
+        gained = int(((Ytr == INTERICTAL) & (W.y != INTERICTAL)).sum())
+        print(f"  {gained:,} more interictal windows for training ({gained * step_s / 3600:.0f} h)")
     n_clock = 0 if args.no_clock else 2
     base = W.X
     if args.context_min:
@@ -188,7 +202,7 @@ def main():
             S = np.empty_like(M)
             for code in range(len(W.subjects)):
                 r = np.flatnonzero(W.subject == code)
-                ref = r[W.y[r] == INTERICTAL]
+                ref = r[Ytr[r] == INTERICTAL]
                 S[r] = scale(M[r], M[ref]) if len(ref) else M[r]
             scaled_all[key] = S
 
@@ -196,18 +210,19 @@ def main():
     it = tqdm(patients, desc="patients") if tqdm else patients
     for subject, code, rows, events in it:
         t, y, tl = W.t_end[rows], W.y[rows], W.timeline[rows]
+        ytr = Ytr[rows]
         folds = [(i, tr, te) for i, tr, te in patient_folds(t, y, tl, events, rules.preictal_start_s, rules.sph_s,
-                                                             rules.interictal_gap_s)
-                 if (y[tr] == PREICTAL).any() and (y[tr] == INTERICTAL).any()]
+                                                             rules.interictal_gap_s, train_labels=ytr)
+                 if (ytr[tr] == PREICTAL).any() and (ytr[tr] == INTERICTAL).any()]
         others = W.rows(pool - {subject})
-        others = others[np.isin(W.y[others], TRAIN_CLASSES)]
+        others = others[np.isin(Ytr[others], TRAIN_CLASSES)]
         others = others[np.round(W.t_end[others] / 5.0).astype(np.int64) % OTHERS_EVERY == 0]
         def patient_matrix(v, train):
             """This patient's rows for variant v, scaled by the fold's training interictal windows if asked."""
             M = mats[v][rows]
             if not args.personal_baseline:
                 return M
-            ref = train[y[train] == INTERICTAL]
+            ref = train[ytr[train] == INTERICTAL]
             return scale(M, M[ref])
 
         def others_matrix(v):
@@ -218,23 +233,23 @@ def main():
             preds, labels = defaultdict(list), []
             general = None
             if "general" in args.variants:
-                general = fit(others_matrix("general"), W.y[others], sample_weights(W.y[others], W.subject[others]), seed)
+                general = fit(others_matrix("general"), Ytr[others], sample_weights(Ytr[others], W.subject[others]), seed)
             for i, train, test in folds:
                 labels.append(y[test])
-                tr = train[np.isin(y[train], TRAIN_CLASSES)]
-                w_self = sample_weights(y[tr], np.zeros(len(tr), dtype=int))
+                tr = train[np.isin(ytr[train], TRAIN_CLASSES)]
+                w_self = sample_weights(ytr[tr], np.zeros(len(tr), dtype=int))
                 for v in ("ps_eeg_clock", "ps_eeg_ctx_clock"):
                     if v in args.variants:
                         P = patient_matrix(v, train)
-                        m = fit(P[tr], y[tr], w_self, seed)
+                        m = fit(P[tr], ytr[tr], w_self, seed)
                         preds[v].append(predict_proba(m, P[test])[:, 0])
                 if general is not None:
                     P = patient_matrix("general", train)
                     preds["general"].append(predict_proba(general, P[test])[:, 0])
                 if "general_personal" in args.variants:
                     P = patient_matrix("general_personal", train)
-                    wg, wp = blend_weights(W.y[others], W.subject[others], y[tr], args.personal_share)
-                    m = fit(np.vstack([others_matrix("general_personal"), P[tr]]), np.concatenate([W.y[others], y[tr]]),
+                    wg, wp = blend_weights(Ytr[others], W.subject[others], ytr[tr], args.personal_share)
+                    m = fit(np.vstack([others_matrix("general_personal"), P[tr]]), np.concatenate([Ytr[others], ytr[tr]]),
                             np.concatenate([wg, wp]), seed)
                     preds["general_personal"].append(predict_proba(m, P[test])[:, 0])
             if not folds:
@@ -275,7 +290,8 @@ def main():
               + (", no time of day" if args.no_clock else "")
               + (f", {args.context_min} min context" if args.context_min else "")
               + (f", personal share {args.personal_share:g}" if args.personal_share != 0.5 else "")
-              + (", cautious trees" if args.cautious_trees else "") + ")")
+              + (", cautious trees" if args.cautious_trees else "")
+              + (f", trained with a {args.train_gap_h:g} h gap" if args.train_gap_h is not None else "") + ")")
     for v in args.variants:
         LABELS[v] = (LABELS[v].replace(" + time of day", "") if args.no_clock else LABELS[v]) + suffix
 

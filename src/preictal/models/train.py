@@ -33,6 +33,9 @@ class Windows:
     timeline: np.ndarray         # index into timelines
     subjects: list[str]
     timelines: list[str]
+    recording: np.ndarray | None = None   # index into recordings
+    starts: np.ndarray | None = None      # window start within its recording (s)
+    recordings: list[str] | None = None
 
     def rows(self, subjects: set[str]) -> np.ndarray:
         codes = [i for i, s in enumerate(self.subjects) if s in subjects]
@@ -45,8 +48,8 @@ def load_windows(feature_dir: Path, datasets: tuple[str, ...], subjects: set[str
     """Load feature files. With keep_per_channel=False only the pooled features are kept
     (per_channel is None), which saves memory. labels keeps only windows with those
     labels; every=k keeps every k-th of those windows per recording."""
-    parts = {k: [] for k in ("per_channel", "conn", "X", "y", "t_end", "subject", "timeline")}
-    subj_codes, tl_codes = {}, {}
+    parts = {k: [] for k in ("per_channel", "conn", "X", "y", "t_end", "subject", "timeline", "recording", "starts")}
+    subj_codes, tl_codes, rec_codes = {}, {}, {}
     for ds in datasets:
         for f in sorted((Path(feature_dir) / ds).glob("*.npz")):
             z = np.load(f, allow_pickle=False)
@@ -71,6 +74,8 @@ def load_windows(feature_dir: Path, datasets: tuple[str, ...], subjects: set[str
                 parts["X"].append(pool(feats) if conn is None else np.hstack([pool(feats), conn]))
             parts["y"].append(z["labels"][keep])
             parts["t_end"].append(z["t_end"][keep])
+            parts["starts"].append(z["starts"][keep])
+            parts["recording"].append(np.full(n, rec_codes.setdefault(str(z["recording"]), len(rec_codes)), np.int32))
             parts["subject"].append(np.full(n, subj_codes.setdefault(subject, len(subj_codes)), np.int32))
             parts["timeline"].append(np.full(n, tl_codes.setdefault(str(z["timeline"]), len(tl_codes)), np.int32))
     if not parts["y"]:
@@ -84,7 +89,8 @@ def load_windows(feature_dir: Path, datasets: tuple[str, ...], subjects: set[str
         per_channel, X = None, np.concatenate(parts["X"])
     return Windows(per_channel, X, np.concatenate(parts["y"]), np.concatenate(parts["t_end"]),
                    np.concatenate(parts["subject"]), np.concatenate(parts["timeline"]),
-                   list(subj_codes), list(tl_codes))
+                   list(subj_codes), list(tl_codes), np.concatenate(parts["recording"]),
+                   np.concatenate(parts["starts"]), list(rec_codes))
 
 
 def sample_weights(y: np.ndarray, subject: np.ndarray) -> np.ndarray:
@@ -121,4 +127,29 @@ def blend_weights(y_general: np.ndarray, subject_general: np.ndarray, y_personal
         if g.any() and p.any():
             wp[p] *= (personal_share / (1 - personal_share)) * wg[g].sum() / wp[p].sum()
     return wg, wp
+
+
+def relabel(W: Windows, timelines, rules, length_s: float, step_s: float) -> np.ndarray:
+    """Labels for the loaded windows under different label rules (evaluation methods v1.12).
+
+    Used to train with a shorter interictal gap while testing with the frozen one. Only the
+    interictal/excluded split can change; preictal and ictal labels must stay identical.
+    """
+    from ..data.labels import ICTAL, PREICTAL, window_labels
+    lookup = {}
+    for tl in timelines:
+        for p in tl.placed:
+            lookup[p.rec.rel_path] = window_labels(p, tl, rules, length_s, step_s)
+    out = W.y.copy()
+    for code, name in enumerate(W.recordings):
+        idx = np.flatnonzero(W.recording == code)
+        st, lab = lookup[name]
+        pos = np.searchsorted(st, W.starts[idx])
+        if np.any(pos >= len(st)) or not np.allclose(st[np.minimum(pos, len(st) - 1)], W.starts[idx]):
+            raise ValueError(f"window starts of {name} don't match its labels; re-run extract_features.py")
+        out[idx] = lab[pos]
+    for c in (PREICTAL, ICTAL):
+        if not np.array_equal(out == c, W.y == c):
+            raise ValueError("relabeling changed preictal or ictal labels; only the interictal gap may change")
+    return out
 

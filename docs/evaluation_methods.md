@@ -2,7 +2,7 @@
 
 | Doc | Version | Author | Written |
 |---|---|---|---|
-| EVM-001 | 1.11 | Kevin Kim | v1.0 before any model was trained; v1.1 and v1.2 after D1, before any D2 result; v1.3 after a one-seed D2 preview; v1.4 after the full D2 run; v1.5 after the personalized variants; v1.6 while the v1.5 test was running, before any v1.6 result; v1.7 before the lockbox audit; v1.8 and v1.9 after it; v1.10 before the final development round; v1.11 before splitting SeizeIT2 (see Section 13) |
+| EVM-001 | 1.12 | Kevin Kim | v1.0 before any model was trained; v1.1 and v1.2 after D1, before any D2 result; v1.3 after a one-seed D2 preview; v1.4 after the full D2 run; v1.5 after the personalized variants; v1.6 while the v1.5 test was running, before any v1.6 result; v1.7 before the lockbox audit; v1.8 and v1.9 after it; v1.10 before the final development round; v1.11 before splitting SeizeIT2; v1.12 during the final development round (see Section 13) |
 
 This document fixes how models are trained, tuned and scored for Deliverables 1 and 2. It adds detail to the verification plan (tag `vtp-1.0`) and doesn't change any of its pass/fail criteria. It is committed before any model is trained so the Git history shows these choices came first. Anything changed after results are seen goes in the version history (Section 11) with a reason.
 
@@ -190,6 +190,8 @@ CHB-MIT and Siena now serve as the development set and SeizeIT2 as the sealed te
   4. more cautious trees: minimum leaf size 200, at most 15 leaves per tree, L2 regularization 1.0.
 * **Evaluation.** Same 22 patients, folds, buffers and seeds as Section 11.1. Each challenger is compared per patient with the base design.
 * **Selection rule, fixed now.** The design to freeze is the base design, unless a challenger's mean AUROC is at least 0.01 higher; if several are, the highest. Combinations of challengers aren't tested, to keep the number of choices small. The choice is made on these 22 patients, so the chosen design's score here is slightly optimistic; the lockbox gives the unbiased estimate.
+* **Challenger 5 (added in v1.12): training with a 1-hour gap.** This is the base design with every training window labeled using a 1 h interictal gap instead of 4 h (`--train-gap-h 1`), so EEG 1–4 h from a seizure is used as normal for training. That covers the patient's and the other patients' training windows, and the windows used for the personal baseline. Testing is unchanged: the held-out interictal chunks are the 4 h interictal windows, nothing within 4 h of the held-out seizure is trained on, and the same 22 patients are tested. The aim is more training data, especially from Siena, without making the test easier.
+* **Combination step (v1.12).** If two or more challengers qualify, the two best are combined in one more run, and the design frozen is the highest-scoring among the qualifying challengers and that combination. This step was added after challengers 1–3 were seen (10 min context 0.700 qualifies; 30 min context 0.654 and personal share 0.75 at 0.688 don't), and before the results of challengers 4 and 5.
 
 ## 12. Lockbox: SeizeIT2 (added in v1.7)
 
@@ -235,3 +237,4 @@ SeizeIT2 v1.1.0 (OpenNeuro ds005873, CC0 licence) was downloaded on 2026-09-28 i
 | 1.9 | 2026-09-28 | After the second audit run (no `scans.tsv`; annotation files have dateTime and recordingDuration columns): added the recording-timing check from the annotation files (Section 12), before running it |
 | 1.10 | 2026-09-29 | After the v1.6 and v1.8 results (best no-clock design 0.681): added the final development round and its selection rule (Section 11.4), before running it |
 | 1.11 | 2026-09-29 | Before splitting SeizeIT2: 25 development and 100 lockbox patients, drawn once from subject IDs with seed 0 (Section 12) |
+| 1.12 | 2026-09-29 | During the final development round, after challengers 1–3 and before 4 and 5: added challenger 5 (training with a 1 h gap, testing with 4 h) and the combination step (Section 11.4) |

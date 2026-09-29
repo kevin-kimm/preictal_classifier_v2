@@ -85,3 +85,18 @@ def test_inner_interictal_folds_hold_out_each_chunk_with_a_gap():
         assert (lab[inner_train] == PREICTAL).any()
         held += list(chunk)
     assert sorted(held) == sorted(train[lab[train] == INTERICTAL])
+
+
+def test_training_labels_widen_training_but_not_the_test():
+    onsets = [10 * H, 30 * H]
+    t, lab4, tl = timeline(onsets, hours=48)
+    # a shorter gap turns some left-out windows into training interictal windows
+    lab1 = lab4.copy()
+    near = (lab4 == EXCLUDED) & np.array([min(abs(x - o) for o in onsets) > 1.2 * H for x in t])
+    lab1[near] = INTERICTAL
+    base = list(patient_folds(t, lab4, tl, [(0, o) for o in onsets]))
+    wide = list(patient_folds(t, lab4, tl, [(0, o) for o in onsets], train_labels=lab1))
+    for (_, tr4, te4), (_, tr1, te1), on in zip(base, wide, onsets):
+        assert np.array_equal(te4, te1)                      # test windows unchanged
+        assert set(tr4) <= set(tr1) and len(tr1) > len(tr4)  # more to train on
+        assert np.all(np.abs(t[tr1] - on) > 4 * H)           # still nothing near the test seizure

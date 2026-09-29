@@ -19,17 +19,19 @@ from ..data.labels import ICTAL, INTERICTAL, PREICTAL
 
 def patient_folds(times: np.ndarray, labels: np.ndarray, timelines: np.ndarray,
                   events: list[tuple[int, float]], preictal_s: float = 1800.0, sph_s: float = 5.0,
-                  block_s: float = 4 * 3600.0, gap_s: float = 300.0):
+                  block_s: float = 4 * 3600.0, gap_s: float = 300.0, train_labels: np.ndarray | None = None):
     """Yield (event index, train indices, test indices) for one patient's windows.
 
-    events are (timeline code, onset) pairs of the patient's eligible seizures.
+    events are (timeline code, onset) pairs of the patient's eligible seizures. Test windows
+    always follow `labels`; with train_labels (evaluation methods v1.12), the windows available
+    for training follow those instead, with the same exclusions around the test windows.
     """
     events = sorted(events)
     n = len(events)
     inter = np.flatnonzero(labels == INTERICTAL)
     inter = inter[np.lexsort((times[inter], timelines[inter]))]
     chunks = np.array_split(inter, n) if n else []
-    trainable = np.isin(labels, (PREICTAL, ICTAL, INTERICTAL))
+    trainable = np.isin(labels if train_labels is None else train_labels, (PREICTAL, ICTAL, INTERICTAL))
     for i, (tl, onset) in enumerate(events):
         pre = np.flatnonzero((timelines == tl) & (labels == PREICTAL)
                              & (times >= onset - preictal_s) & (times <= onset - sph_s))
