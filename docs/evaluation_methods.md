@@ -2,7 +2,7 @@
 
 | Doc | Version | Author | Written |
 |---|---|---|---|
-| EVM-001 | 1.10 | Kevin Kim | v1.0 before any model was trained; v1.1 and v1.2 after D1, before any D2 result; v1.3 after a one-seed D2 preview; v1.4 after the full D2 run; v1.5 after the personalized variants; v1.6 while the v1.5 test was running, before any v1.6 result; v1.7 before the lockbox audit; v1.8 and v1.9 after it; v1.10 before the final development round (see Section 13) |
+| EVM-001 | 1.11 | Kevin Kim | v1.0 before any model was trained; v1.1 and v1.2 after D1, before any D2 result; v1.3 after a one-seed D2 preview; v1.4 after the full D2 run; v1.5 after the personalized variants; v1.6 while the v1.5 test was running, before any v1.6 result; v1.7 before the lockbox audit; v1.8 and v1.9 after it; v1.10 before the final development round; v1.11 before splitting SeizeIT2 (see Section 13) |
 
 This document fixes how models are trained, tuned and scored for Deliverables 1 and 2. It adds detail to the verification plan (tag `vtp-1.0`) and doesn't change any of its pass/fail criteria. It is committed before any model is trained so the Git history shows these choices came first. Anything changed after results are seen goes in the version history (Section 11) with a reason.
 
@@ -212,7 +212,12 @@ SeizeIT2 v1.1.0 (OpenNeuro ds005873, CC0 licence) was downloaded on 2026-09-28 i
 
 **Not allowed before the design is frozen:** reading or plotting EEG samples, computing features, looking at any seizure timing or at any per-patient seizure information, or running any model on the data.
 
-**Planned use.** Once the design is frozen, and written down here as a new version, the frozen method is applied once to SeizeIT2. The personalized pipeline and its rules stay unchanged, apart from a channel-mapping adapter for the behind-the-ear EEG, which is written using only the audit's header information. The results are reported whatever they are, and nothing is changed after seeing them.
+**Development and lockbox split (v1.11).** Before anything beyond the audit is looked at, SeizeIT2 is split once by `scripts/split_seizeit2.py`. It draws 25 of the 125 subject IDs at random (seed 0) for development and leaves the other 100 as the lockbox. It uses only the subject folder names, no seizure or recording information. The split is saved to `configs/seizeit2_split.yaml`, and the script refuses to run again once that file exists.
+
+* **Development patients** may be used to build and debug the behind-the-ear channel adapter and loaders, to check that the pipeline runs end to end, and later for wearable-specific development. They are never part of a lockbox result.
+* **Lockbox patients** stay sealed under the rules above.
+
+**Planned use.** Once the design is frozen, and written down here as a new version, the frozen method is applied once to SeizeIT2. The personalized pipeline and its rules stay unchanged, apart from a channel-mapping adapter for the behind-the-ear EEG, which is written using only the audit's header information. It is applied to the 100 lockbox patients. The results are reported whatever they are, and nothing is changed after seeing them.
 
 ## 13. Version history
 
@@ -229,3 +234,4 @@ SeizeIT2 v1.1.0 (OpenNeuro ds005873, CC0 licence) was downloaded on 2026-09-28 i
 | 1.8 | 2026-09-28 | After the blind audit (anonymized SeizeIT2 clock times; 97 subjects with at least two seizures): added no-time-of-day versions of the personal-baseline variants (Section 11.3) and a recording-timing check to the audit (Section 12), before running either |
 | 1.9 | 2026-09-28 | After the second audit run (no `scans.tsv`; annotation files have dateTime and recordingDuration columns): added the recording-timing check from the annotation files (Section 12), before running it |
 | 1.10 | 2026-09-29 | After the v1.6 and v1.8 results (best no-clock design 0.681): added the final development round and its selection rule (Section 11.4), before running it |
+| 1.11 | 2026-09-29 | Before splitting SeizeIT2: 25 development and 100 lockbox patients, drawn once from subject IDs with seed 0 (Section 12) |

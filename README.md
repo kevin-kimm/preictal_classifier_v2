@@ -32,11 +32,48 @@ Development follows design-control practices in a lightweight form. Requirements
 | Preictal | 30 min to 5 s before seizure onset: the period in which a correct warning must arrive |
 | Seizure prediction horizon | 5 s, the minimum warning time |
 | Ictal | Seizure onset to offset, from expert annotations |
-| Interictal | At least 4 h away from any seizure |
+| Interictal | At least 4 h away from any seizure (see [Defining normal EEG](#defining-normal-eeg-why-a-4-hour-gap)) |
 | Alarm | A discrete warning, followed by a 30 min period in which no new alarm is raised |
 | True alarm | An alarm followed by a seizure onset 5 s to 30 min later |
 
 Full rules, including edge cases such as clustered seizures and gaps in recordings, are in Section 3 of the [verification plan](docs/verification_plan.md).
+
+## Defining normal EEG: why a 4-hour gap
+
+To count false alarms fairly, the software needs stretches of EEG that are clearly normal: far enough from any seizure that nothing seizure-related is going on. Here, "normal" (interictal) means at least 4 hours from any seizure, before or after. Everything between that gap and the 30-minute warning window is left out of training and testing.
+
+The gap guards against two things:
+
+* **After a seizure,** brain activity can stay slowed for minutes to hours while the brain recovers.
+* **Before a seizure,** changes may start earlier than the 30-minute warning window in some people.
+
+Labeling either as normal would distort the results. The choice is a research convention, not a rule of machine learning, and published studies vary:
+
+| Gap | Normal EEG available | Risk of mislabeling | Where it's used |
+|---|---|---|---|
+| 1 h | Most | Highest: some post-seizure recovery, and possibly early pre-seizure changes, may count as normal | Less conservative studies |
+| 2 h | More | Moderate | A middle ground |
+| **4 h** | Least | Lowest | The Kaggle and Melbourne seizure-prediction competitions and many CHB-MIT studies (this project) |
+
+The 4-hour gap was fixed in the [verification plan](docs/verification_plan.md) before any testing. Because definitions like this are sometimes chosen after seeing results, it stays fixed for the main results.
+
+**What a shorter gap would change.** `scripts/gap_whatif.py` counts labels under different gaps, without training or testing anything:
+
+| Gap | CHB-MIT normal EEG | Siena normal EEG | Siena test patients | Patients for the personalized test (CHB-MIT + Siena) |
+|---|---|---|---|---|
+| 1 h | 766 h | 75 h | 13 | 22 + 11 = 33 |
+| 2 h | 675 h | 39 h | 4 | 21 + 3 = 24 |
+| 4 h | 564 h | 22 h | 4 | 20 + 3 = 23 |
+
+A 2-hour gap adds almost nothing, while a 1-hour gap would triple the number of testable Siena patients, because Siena's seizures come close together. (The personalized runs used 22 patients at 4 hours rather than 23, because they count normal EEG in 30-second windows, so one patient sits just under the 1-hour minimum.)
+
+**Plan.**
+
+* **Main results:** the main results, including the final test on SeizeIT2, keep the 4-hour gap.
+* **1-hour sensitivity analysis:** after the final design is frozen, it will be tested once with a 1-hour gap on CHB-MIT and Siena and reported alongside, to show whether the conclusions depend on this choice.
+* **Possible later experiment:** training with the extra normal EEG a 1-hour gap provides, while testing only against the 4-hour definition.
+
+A plain-language explanation with figures is in [`docs/notes/normal_EEG_gap.pdf`](docs/notes/normal_EEG_gap.pdf).
 
 ## Datasets
 
@@ -49,6 +86,7 @@ The datasets are not included in this repository. Each has its own data use term
 | TUH EEG Seizure Corpus (TUSZ) | 2.0.6 | False alarm testing in D1 (no usable preictal data, see below); adding it to training is a D2 experiment | 675 patients | Varies | Referential |
 | TUH EEG Artifact Corpus (TUAR) | 3.0.1 | Artifact robustness testing | 213 patients | Varies | Referential |
 | EEG During Mental Arithmetic Tasks | 1.0.0 | False alarm testing in people without epilepsy | 36 healthy subjects | 500 Hz | Referential |
+| SeizeIT2 | 1.1.0 | Sealed final test (100 patients); 25 patients for development | 125 patients with focal epilepsy | See audit | Behind-the-ear wearable (2–3 channels) |
 
 The counts below come from the data audit (verification test VT-01, [`results/d1/data_audit.md`](results/d1/data_audit.md)), not from the dataset papers.
 
@@ -63,6 +101,22 @@ The counts below come from the data audit (verification test VT-01, [`results/d1
 In CHB-MIT, cases chb01 and chb21 come from the same person and are treated as one patient in cross-patient splits.
 
 TUSZ can't be used for prediction: its start times are anonymized and its files are at most 30 minutes long, so no TUSZ seizure has its 30-minute lead-up recorded (finding F-13 in the [D1 results](docs/verification_results/D1.md)). It is used for false alarm testing instead. After labeling, 25 patients can be test patients: 21 from CHB-MIT and 4 from Siena.
+
+### SeizeIT2: data kept for the final test
+
+SeizeIT2 (OpenNeuro ds005873, CC0 licence) is wearable data from 125 patients with focal epilepsy, recorded with behind-the-ear EEG plus ECG, EMG and movement sensors during hospital monitoring. It was downloaded on 2026-09-28 (24,877 files, 117.2 GiB) and is kept sealed as a **lockbox**: data that plays no part in designing the model and is used once, at the end, to test the frozen design. That gives one result free of the optimism that builds up when many ideas are tried on the same development data.
+
+**What may be looked at before the freeze** is limited and recorded in Section 12 of the [evaluation methods](docs/evaluation_methods.md). A blind audit (`scripts/audit_seizeit2.py`, report in [`results/lockbox/seizeit2_feasibility.md`](results/lockbox/seizeit2_feasibility.md)) read only file listings, EDF headers and annotation column names, and reported seizure numbers only as dataset totals. It found:
+
+* all 11,009 EDF files readable;
+* 11,626 h of EEG on the `BTEleft SD`, `BTEright SD` and `CROSStop SD` channels;
+* 883 seizures, with 97 patients having at least two;
+* every EEG file starting at 00:00:00. The clock times are anonymized, so the design tested on SeizeIT2 can't use the time of day.
+
+**Split.** SeizeIT2 is split once, at random from patient IDs only (seed 0, `scripts/split_seizeit2.py`, saved in `configs/seizeit2_split.yaml`):
+
+* **25 patients for development:** building and checking the behind-the-ear adapter;
+* **100 patients sealed as the lockbox.**
 
 ### Getting the data
 
@@ -208,7 +262,7 @@ A detailed comparison, including results, is part of the Deliverable 1 verificat
 
 ## Known limitations
 
-These are known before testing and will be revisited in the final analysis. TUSZ recordings are short and their start times anonymized, so no TUSZ seizure has a usable preictal period; TUSZ is used only for false alarm testing in D1. Only 25 patients (21 CHB-MIT, 4 Siena) can be test patients, so results rest on a small group dominated by children's recordings. CHB-MIT is pediatric and recorded in a bipolar montage, which constrains the common representation for all datasets. Seizure onsets come from expert annotations, which carry their own uncertainty. The datasets were recorded with clinical equipment in hospital settings, which differs from a consumer headband. In CHB-MIT and Siena, the time of day alone separates preictal from interictal periods better than the D1 EEG model, so EEG results must be compared with a clock-only baseline, not just with 0.5. Live tests use seizure-free recordings, so they can measure false alarms but not whether seizures are predicted. The mental arithmetic recordings total only 2.4 h, which is too short to estimate a false alarm rate; they are used to check that task-related EEG changes don't trigger alarms.
+These are known before testing and will be revisited in the final analysis. TUSZ recordings are short and their start times anonymized, so no TUSZ seizure has a usable preictal period; TUSZ is used only for false alarm testing in D1. Only 25 patients (21 CHB-MIT, 4 Siena) can be test patients, so results rest on a small group dominated by children's recordings. CHB-MIT is pediatric and recorded in a bipolar montage, which constrains the common representation for all datasets. Seizure onsets come from expert annotations, which carry their own uncertainty. The datasets were recorded with clinical equipment in hospital settings, which differs from a consumer headband. In CHB-MIT and Siena, the time of day alone separates preictal from interictal periods better than the D1 EEG model, so EEG results must be compared with a clock-only baseline, not just with 0.5. Live tests use seizure-free recordings, so they can measure false alarms but not whether seizures are predicted. The 4-hour gap that defines normal EEG leaves only 4 Siena patients testable across patients and 3 in the personalized test; a 1-hour gap would allow 13 and 11, at a higher risk of mislabeling (see [Defining normal EEG](#defining-normal-eeg-why-a-4-hour-gap)). The mental arithmetic recordings total only 2.4 h, which is too short to estimate a false alarm rate; they are used to check that task-related EEG changes don't trigger alarms.
 
 ## Citations
 
@@ -225,6 +279,10 @@ Obeid, I., & Picone, J. (2016). The Temple University Hospital EEG Data Corpus. 
 Hamid, A., Gagliano, K., Rahman, S., Tulin, N., Tchiong, V., Obeid, I., & Picone, J. (2020). The Temple University Artifact Corpus: An annotated corpus of EEG artifacts. *IEEE Signal Processing in Medicine and Biology Symposium (SPMB)*.
 
 Zyma, I., Tukaev, S., Seleznov, I., Kiyono, K., Popov, A., Chernykh, M., & Shpenkov, O. (2019). Electroencephalograms during mental arithmetic task performance. *Data*, 4(1), 14.
+
+Bhagubai, M., Chatzichristos, C., Swinnen, L., et al. (2025). SeizeIT2: Wearable dataset of patients with focal epilepsy. *arXiv preprint* arXiv:2502.01224.
+
+Brinkmann, B. H., et al. (2016). Crowdsourcing reproducible seizure forecasting in human and canine epilepsy. *Brain*, 139(6), 1713–1722.
 
 Goldberger, A. L., et al. (2000). PhysioBank, PhysioToolkit, and PhysioNet: Components of a new research resource for complex physiologic signals. *Circulation*, 101(23), e215–e220.
 
