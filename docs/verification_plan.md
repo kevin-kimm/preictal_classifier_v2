@@ -6,7 +6,7 @@ Version 1.0, frozen 2026-09-25. Author: Kevin Kim.
 
 This plan lists every test for Deliverables 1–3, how each one is run, and what counts as a pass or fail. I'm writing it before any testing and freezing it in Git as v1.0, so the commit history shows the criteria came first.
 
-Results go in `docs/verification_results/` (one file per deliverable), including failed tests and per-patient data. Each results file cites the commit hash of the plan version it was tested against. If something has to change after v1.0, it becomes a new version with the reason logged in Section 9. Criteria don't get edited to fit results.
+Results go in `docs/verification_results/` (one file per deliverable), including failed tests and per patient data. Each results file cites the commit hash of the plan version it was tested against. If something has to change after v1.0, it becomes a new version with the reason logged in Section 9. Criteria don't get edited to fit results.
 
 There are two kinds of test. Verification tests have a pass/fail threshold. Characterization tests measure and report something I don't have a defensible threshold for yet.
 

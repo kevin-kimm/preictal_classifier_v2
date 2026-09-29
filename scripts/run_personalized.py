@@ -21,6 +21,13 @@ Feature set v2 and the personal baseline (evaluation methods v1.6, Section 11.3)
     --no-clock              leave out the time-of-day features (evaluation methods v1.8): SeizeIT2's
                             clock times are anonymized, so the design tested there can't use them
 
+Final development round (evaluation methods v1.10, Section 11.4):
+    --context-min N         add the mean and slope of each feature over the preceding N min
+    --personal-share S      share of each class's weight given to the patient's own windows (default 0.5)
+    --cautious-trees        gradient boosting with larger leaves, fewer leaves per tree and L2 regularization
+    --compare-to FILE       results/d2 file to compare with (default personalized.csv) ...
+    --compare-label TEXT    ... and how to label it
+
 Usage, from the repo root with .venv active:
     python scripts/run_personalized.py                   all variants, five seeds (about 2 h)
     python scripts/run_personalized.py --seeds 0         quicker look
@@ -76,8 +83,16 @@ def auroc(y, s):
     return float(roc_auc_score(y, s)) if y.any() and (~y).any() else float("nan")
 
 
+CAUTIOUS = False
+
+
 def fit(X, y, w, seed):
-    model = build_model(seed)
+    if CAUTIOUS:
+        from sklearn.ensemble import HistGradientBoostingClassifier
+        model = HistGradientBoostingClassifier(random_state=seed, min_samples_leaf=200, max_leaf_nodes=15,
+                                               l2_regularization=1.0)
+    else:
+        model = build_model(seed)
     model.fit(X, y, sample_weight=w)
     return model
 
@@ -91,9 +106,16 @@ def main():
     ap.add_argument("--personal-baseline", action="store_true")
     ap.add_argument("--tag", default="")
     ap.add_argument("--no-clock", action="store_true")
+    ap.add_argument("--context-min", type=int, default=0)
+    ap.add_argument("--personal-share", type=float, default=0.5)
+    ap.add_argument("--cautious-trees", action="store_true")
+    ap.add_argument("--compare-to", default="personalized.csv")
+    ap.add_argument("--compare-label", default="feature set v1 with time of day, no baseline")
     ap.add_argument("--out", type=Path, default=REPO / "results" / "d2")
     args = ap.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
+    global CAUTIOUS
+    CAUTIOUS = args.cautious_trees
     if args.features is None:
         args.features = REPO / "data" / "processed" / ("features_v2" if args.feature_set == "v2" else "features")
 
@@ -111,7 +133,18 @@ def main():
     W = load_windows(args.features, datasets, version=version, keep_per_channel=False)
     clock = clock_features(W.t_end, np.array([timeline_has_clock(k) for k in W.timelines])[W.timeline])
     n_clock = 0 if args.no_clock else 2
-    X_clock = W.X if args.no_clock else np.hstack([W.X, clock])
+    base = W.X
+    if args.context_min:
+        cache = args.features.parent / "d2_cache" / f"train_ctx{args.context_min}r_{version}_{cache_key(W)}.npy"
+        if cache.exists():
+            ctx_extra = np.load(cache)
+        else:
+            print(f"  computing {args.context_min} min context features (one-off, cached)...")
+            ctx_extra = context_features(W.X, W.timeline, W.t_end, args.context_min * 60)
+            cache.parent.mkdir(parents=True, exist_ok=True)
+            np.save(cache, ctx_extra)
+        base = np.hstack([W.X, ctx_extra])
+    X_clock = base if args.no_clock else np.hstack([base, clock])
     X_ctx_clock = None
     if "ps_eeg_ctx_clock" in args.variants:
         cache = args.features.parent / "d2_cache" / f"train_ctx10r_{version}_{cache_key(W)}.npy"   # shared with run_d2.py
@@ -200,7 +233,7 @@ def main():
                     preds["general"].append(predict_proba(general, P[test])[:, 0])
                 if "general_personal" in args.variants:
                     P = patient_matrix("general_personal", train)
-                    wg, wp = blend_weights(W.y[others], W.subject[others], y[tr], 0.5)
+                    wg, wp = blend_weights(W.y[others], W.subject[others], y[tr], args.personal_share)
                     m = fit(np.vstack([others_matrix("general_personal"), P[tr]]), np.concatenate([W.y[others], y[tr]]),
                             np.concatenate([wg, wp]), seed)
                     preds["general_personal"].append(predict_proba(m, P[test])[:, 0])
@@ -224,7 +257,7 @@ def main():
                                                         "ps_clock": float(r["clock_only_auroc"])}
     for r in rows_out:
         r.update(prev.get((r["subject"], r["seed"]), {"ps_eeg": float("nan"), "ps_clock": float("nan")}))
-    v1_file = args.out / "personalized.csv"
+    v1_file = args.out / args.compare_to
     v1_shown = []
     if args.tag and v1_file.exists():
         v1 = {}
@@ -233,13 +266,16 @@ def main():
                 v1[(r["subject"], int(r["seed"]))] = r
         for v in args.variants:
             key = f"{v}_v1"
-            LABELS[key] = LABELS[v] + " (feature set v1, no baseline)"
+            LABELS[key] = LABELS[v].split(",")[0] + f" ({args.compare_label})"
             v1_shown.append(key)
             for r in rows_out:
                 old = v1.get((r["subject"], r["seed"]), {})
                 r[key] = float(old[v]) if old.get(v) not in (None, "") else float("nan")
     suffix = (f" (feature set {args.feature_set}" + (", personal baseline" if args.personal_baseline else "")
-              + (", no time of day)" if args.no_clock else ")"))
+              + (", no time of day" if args.no_clock else "")
+              + (f", {args.context_min} min context" if args.context_min else "")
+              + (f", personal share {args.personal_share:g}" if args.personal_share != 0.5 else "")
+              + (", cautious trees" if args.cautious_trees else "") + ")")
     for v in args.variants:
         LABELS[v] = (LABELS[v].replace(" + time of day", "") if args.no_clock else LABELS[v]) + suffix
 
@@ -307,7 +343,8 @@ def main():
     for v in args.variants:
         if f"{v}_v1" in shown:
             p, wins, n = paired(v, f"{v}_v1")
-            print(f"{v}: this run beat the v1 result in {wins} of {n} patients (Wilcoxon p {p:.3g})")
+            print(f"{v}: this run beat the comparison ({args.compare_label}) in {wins} of {n} patients "
+                  f"(Wilcoxon p {p:.3g})")
     print(f"Report: {args.out / f'personalized{args.tag}.md'}")
 
 

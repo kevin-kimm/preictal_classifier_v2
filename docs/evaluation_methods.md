@@ -2,7 +2,7 @@
 
 | Doc | Version | Author | Written |
 |---|---|---|---|
-| EVM-001 | 1.8 | Kevin Kim | v1.0 before any model was trained; v1.1 and v1.2 after D1, before any D2 result; v1.3 after a one-seed D2 preview; v1.4 after the full D2 run; v1.5 after the personalized variants; v1.6 while the v1.5 test was running, before any v1.6 result; v1.7 before the lockbox audit; v1.8 after it (see Section 13) |
+| EVM-001 | 1.10 | Kevin Kim | v1.0 before any model was trained; v1.1 and v1.2 after D1, before any D2 result; v1.3 after a one-seed D2 preview; v1.4 after the full D2 run; v1.5 after the personalized variants; v1.6 while the v1.5 test was running, before any v1.6 result; v1.7 before the lockbox audit; v1.8 and v1.9 after it; v1.10 before the final development round (see Section 13) |
 
 This document fixes how models are trained, tuned and scored for Deliverables 1 and 2. It adds detail to the verification plan (tag `vtp-1.0`) and doesn't change any of its pass/fail criteria. It is committed before any model is trained so the Git history shows these choices came first. Anything changed after results are seen goes in the version history (Section 11) with a reason.
 
@@ -178,6 +178,19 @@ This is a characterization, with no pass/fail threshold. It uses the same patien
   * scaling to a baseline may remove differences between states (for example sleep and wake) that carry information;
   * with 22 patients, real gains of a few hundredths may not be distinguishable from noise.
 
+### 11.4 Final development round (added in v1.10)
+
+CHB-MIT and Siena now serve as the development set and SeizeIT2 as the sealed test set (Section 12). This round picks the design to freeze.
+
+* **Base design:** other patients + this patient, feature set v2, personal baseline, no time of day (AUROC 0.681 in Section 11.3). It doesn't use the time of day because SeizeIT2 can't.
+* **Four challengers,** each changing one thing (`scripts/run_personalized.py`):
+  1. a 10 min context: the mean and slope of each feature over the preceding 10 min, scaled by the personal baseline like the other features;
+  2. a 30 min context;
+  3. a personal share of 0.75, so the patient's own windows carry three quarters of each class's weight;
+  4. more cautious trees: minimum leaf size 200, at most 15 leaves per tree, L2 regularization 1.0.
+* **Evaluation.** Same 22 patients, folds, buffers and seeds as Section 11.1. Each challenger is compared per patient with the base design.
+* **Selection rule, fixed now.** The design to freeze is the base design, unless a challenger's mean AUROC is at least 0.01 higher; if several are, the highest. Combinations of challengers aren't tested, to keep the number of choices small. The choice is made on these 22 patients, so the chosen design's score here is slightly optimistic; the lockbox gives the unbiased estimate.
+
 ## 12. Lockbox: SeizeIT2 (added in v1.7)
 
 SeizeIT2 v1.1.0 (OpenNeuro ds005873, CC0 licence) was downloaded on 2026-09-28 into `data/raw/seizeit2_v1.1.0/`: 24,877 files, 117.2 GiB. It has 125 patients with focal epilepsy, behind-the-ear EEG and other wearable signals. It is kept sealed until the final design is frozen, so it can give one unbiased test of that design.
@@ -188,12 +201,14 @@ SeizeIT2 v1.1.0 (OpenNeuro ds005873, CC0 licence) was downloaded on 2026-09-28 i
 * `dataset_description.json` and `CHANGES`, to confirm the version;
 * the blind feasibility audit (`scripts/audit_seizeit2.py`). It reads only file listings, EDF headers (channel names, sampling rates, durations and start times), and the column names and event categories of the annotation files. It reports seizure numbers only as totals across the whole dataset. Its report, `results/lockbox/seizeit2_feasibility.md`, is committed as a record of what was looked at.
 * since v1.8, the recording start times in the BIDS `scans.tsv` files and the gaps between consecutive EEG recordings. This is recording timing only, nothing about seizures, and it decides whether recordings can be placed on one timeline.
+* since v1.9, the `dateTime` and `recordingDuration` columns of the annotation files. They are used only if every row of a file carries the same `dateTime`, which makes it the recording's start time rather than an event's. Otherwise they are counted and not used, and no time is printed. Only totals, and the gaps between consecutive recordings, are reported.
 
 **What the first audit found (2026-09-28).**
 
 * **Coverage:** 125 subjects and 11,009 EDF files, all readable. EEG is in 2,850 files (11,626 h) with behind-the-ear channels `BTEleft SD`, `BTEright SD` and `CROSStop SD`, plus ECG, EMG and movement recordings.
 * **Clock times:** every EEG file starts at 00:00:00.
 * **Seizures:** 883 in total; 97 subjects have at least two.
+* **Recording timing (second run, v1.8):** there are no `scans.tsv` files. All 2,850 annotation files have the columns onset, duration, eventType, lateralization, localization, vigilance, confidence, channels, dateTime and recordingDuration.
 
 **Not allowed before the design is frozen:** reading or plotting EEG samples, computing features, looking at any seizure timing or at any per-patient seizure information, or running any model on the data.
 
@@ -212,3 +227,5 @@ SeizeIT2 v1.1.0 (OpenNeuro ds005873, CC0 licence) was downloaded on 2026-09-28 i
 | 1.6 | 2026-09-27 | While the v1.5 test was running and before any v1.6 result: added feature set v2 and the personal baseline (Section 11.3) |
 | 1.7 | 2026-09-28 | Before any look at SeizeIT2 beyond file counts and the version files: added the lockbox rules and the blind feasibility audit (Section 12) |
 | 1.8 | 2026-09-28 | After the blind audit (anonymized SeizeIT2 clock times; 97 subjects with at least two seizures): added no-time-of-day versions of the personal-baseline variants (Section 11.3) and a recording-timing check to the audit (Section 12), before running either |
+| 1.9 | 2026-09-28 | After the second audit run (no `scans.tsv`; annotation files have dateTime and recordingDuration columns): added the recording-timing check from the annotation files (Section 12), before running it |
+| 1.10 | 2026-09-29 | After the v1.6 and v1.8 results (best no-clock design 0.681): added the final development round and its selection rule (Section 11.4), before running it |
