@@ -221,12 +221,22 @@ Window-level performance is measured by AUROC (preictal vs interictal) and a thr
 | Mean LOPO AUROC (± SD across seeds) | 0.556 ± 0.007 (95% CI 0.502–0.616) | 0.614 ± 0.007 (0.528 without time of day) | – |
 | Clock-only baseline AUROC | 0.697 (seed 0) | 0.691 | Not applicable |
 | Patient-specific AUROC (22 patients, EEG only) | – | 0.662 (95% CI 0.588–0.742) | Not applicable |
+| **Frozen personalized design** (general + personal, no time of day), AUROC on development data | – | 0.700 (95% CI 0.630–0.768; optimistic, chosen on these patients) | Not applicable |
+| Frozen design alarms, target ≤ 5 / ≤ 1 false alarms per 24 h | – | 16% warned at 3.43 per 24 h (chance 7%) / 9% at 1.41 (chance 3%) | – |
 | Event sensitivity | 0.21 (chance at this rate: 0.20) | 0.16 (chance: 0.11) | Not applicable |
 | False alarms per 24 h, test patients | 10.61 | 5.84 | – |
 | False alarms per 24 h, TUSZ (unseen patients) | 69.67 | 55.2 (held-out half) | – |
 | Time in warning, median warning time | see [`lopo_report.md`](results/d1/lopo_report.md) | see [`d2_report.md`](results/d2/d2_report.md) | Not applicable |
 
 D1 is a deliberately simple, untuned baseline. It detects seizures well (AUROC 0.865 for windows inside a seizure) but predicts them only slightly better than chance, and a model that knows only the time of day does better (see findings F-18 to F-23 in the [D1 results](docs/verification_results/D1.md)). D2 tried normalization, context, time of day, TUSZ data and a neural network, chosen per patient by nested cross-validation. Its gain over D1 came entirely from the time of day, and its alarms stayed near chance. Trained on the same person's other seizures, though, the D1 model reaches 0.662 from EEG alone, which points to a personalized design (findings F2-01 to F2-05 in the [D2 results](docs/verification_results/D2.md)).
+
+**Personalized designs.** A series of pre-planned tests on the 22 patients with at least two seizures found that brain waves become predictive only once the model has seen the person:
+
+* **Without the time of day,** a model trained on other people is at chance (0.529), while adding the person's own data raises it to 0.681, improving 19 of 22 patients.
+* **Changes that didn't help:** richer features, longer context, more cautious trees and more normal training EEG.
+* **The frozen design** (general + personal, feature set v2, personal baseline, 10 min context, no time of day; Git tag `freeze-v1.13`) warns about 2–3 times as many seizures as random alarms. That is a real signal, but far from a usable warning device.
+
+It will be tested once on 100 sealed SeizeIT2 patients (findings F2-07 to F2-14).
 
 ## Comparison with v1
 
@@ -254,6 +264,8 @@ A detailed comparison, including results, is part of the Deliverable 1 verificat
 | 2 (40%) | Classifier improved by at least 15% over D1 | 10% | Not met: +10.5%, all from the time of day |
 | 2 | Alarm generation logic | 5% | Done (VT-16 passed) |
 | 2 | Event sensitivity and false alarm targets | – | Not met: 16% warned at 5.84 false alarms per 24 h |
+| 2 | Personalized designs and final development round (added) | – | Done; design frozen (`freeze-v1.13`) |
+| 2 | SeizeIT2 lockbox test of the frozen design (added) | – | Audit and split done; adapter next |
 | 2 | Final analysis of results | 10% | In progress |
 | 2 | README | 15% | In progress |
 | 3 (20%) | Local interface showing dataset replay and alarms | 10% | Not started |
@@ -262,7 +274,7 @@ A detailed comparison, including results, is part of the Deliverable 1 verificat
 
 ## Known limitations
 
-These are known before testing and will be revisited in the final analysis. TUSZ recordings are short and their start times anonymized, so no TUSZ seizure has a usable preictal period; TUSZ is used only for false alarm testing in D1. Only 25 patients (21 CHB-MIT, 4 Siena) can be test patients, so results rest on a small group dominated by children's recordings. CHB-MIT is pediatric and recorded in a bipolar montage, which constrains the common representation for all datasets. Seizure onsets come from expert annotations, which carry their own uncertainty. The datasets were recorded with clinical equipment in hospital settings, which differs from a consumer headband. In CHB-MIT and Siena, the time of day alone separates preictal from interictal periods better than the D1 EEG model, so EEG results must be compared with a clock-only baseline, not just with 0.5. Live tests use seizure-free recordings, so they can measure false alarms but not whether seizures are predicted. The 4-hour gap that defines normal EEG leaves only 4 Siena patients testable across patients and 3 in the personalized test; a 1-hour gap would allow 13 and 11, at a higher risk of mislabeling (see [Defining normal EEG](#defining-normal-eeg-why-a-4-hour-gap)). The mental arithmetic recordings total only 2.4 h, which is too short to estimate a false alarm rate; they are used to check that task-related EEG changes don't trigger alarms.
+These are known before testing and will be revisited in the final analysis. TUSZ recordings are short and their start times anonymized, so no TUSZ seizure has a usable preictal period; TUSZ is used only for false alarm testing in D1. Only 25 patients (21 CHB-MIT, 4 Siena) can be test patients, so results rest on a small group dominated by children's recordings. CHB-MIT is pediatric and recorded in a bipolar montage, which constrains the common representation for all datasets. Seizure onsets come from expert annotations, which carry their own uncertainty. The datasets were recorded with clinical equipment in hospital settings, which differs from a consumer headband. Only 2–10 seizures per patient are available for personalization, which appears to be the main limit on accuracy. SeizeIT2's clock times are anonymized, so its recordings are placed back to back in run order, with preictal windows taken only from the seizure's own file. In CHB-MIT and Siena, the time of day alone separates preictal from interictal periods better than the D1 EEG model, so EEG results must be compared with a clock-only baseline, not just with 0.5. Live tests use seizure-free recordings, so they can measure false alarms but not whether seizures are predicted. The 4-hour gap that defines normal EEG leaves only 4 Siena patients testable across patients and 3 in the personalized test; a 1-hour gap would allow 13 and 11, at a higher risk of mislabeling (see [Defining normal EEG](#defining-normal-eeg-why-a-4-hour-gap)). The mental arithmetic recordings total only 2.4 h, which is too short to estimate a false alarm rate; they are used to check that task-related EEG changes don't trigger alarms.
 
 ## Citations
 
