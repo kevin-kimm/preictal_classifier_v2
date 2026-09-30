@@ -236,7 +236,9 @@ D1 is a deliberately simple, untuned baseline. It detects seizures well (AUROC 0
 * **Changes that didn't help:** richer features, longer context, more cautious trees and more normal training EEG.
 * **The frozen design** (general + personal, feature set v2, personal baseline, 10 min context, no time of day; Git tag `freeze-v1.13`) warns about 2–3 times as many seizures as random alarms. That is a real signal, but far from a usable warning device.
 
-It will be tested once on 100 sealed SeizeIT2 patients (findings F2-07 to F2-14).
+It will be tested once on 100 sealed SeizeIT2 patients (findings F2-07 to F2-15).
+
+A planned sensitivity analysis with a 1-hour gap for normal EEG lowered the frozen design's score on the same 22 patients (0.700 → 0.649), while 11 patients who become testable only under that looser definition scored 0.794. The choice of gap therefore matters by about 0.05, and the 4-hour result stays the main one (F2-15).
 
 ## Comparison with v1
 
