@@ -30,7 +30,9 @@ sys.path.insert(0, str(REPO / "src"))
 
 from preictal.config import load_config  # noqa: E402
 from preictal.data.labels import ICTAL, INTERICTAL, PREICTAL, LabelRules  # noqa: E402
-from preictal.data.seizeit2 import discover_patient, recording_features, timeline, window_labels  # noqa: E402
+from preictal.data.seizeit2 import (  # noqa: E402
+    FEATURE_CODE, VERSION_TEXT, discover_patient, recording_features, timeline, window_labels,
+)
 from preictal.features.build_features import feature_version  # noqa: E402
 from preictal.models.train import feature_file  # noqa: E402
 
@@ -40,7 +42,6 @@ except ImportError:
     tqdm = None
 
 ROOT = REPO / "data" / "raw" / "seizeit2_v1.1.0"
-CODE = "d2-v2-bte"
 
 
 def work(job):
@@ -70,7 +71,7 @@ def main():
     cfg = load_config()
     rules = LabelRules.from_config(cfg)
     length_s, step_s = cfg["windows"]["length_s"], cfg["windows"]["step_s"]
-    version = feature_version(cfg, "seizeit2 adapter", CODE)
+    version = feature_version(cfg, VERSION_TEXT, FEATURE_CODE)
     split = yaml.safe_load((REPO / "configs" / "seizeit2_split.yaml").read_text())
     subjects = split[args.group]
     print(f"{len(subjects)} {args.group} patients; feature version {version}")

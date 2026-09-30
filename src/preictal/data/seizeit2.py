@@ -32,6 +32,7 @@ from .labels import (
 from .loaders import Recording
 
 CHANNELS = ("BTEleft SD", "BTEright SD", "CROSStop SD")
+FEATURE_CODE, VERSION_TEXT = "d2-v2-bte", "seizeit2 adapter"      # feature version inputs
 HOMOLOGOUS_BTE = [("BTEleft SD", "BTEright SD")]
 
 
@@ -169,3 +170,30 @@ def recording_features(path: Path, starts_s: np.ndarray, length_s: float, chunk_
             conn[k0:k0 + len(chunk)][ok] = connectivity_features(x, present, TARGET_FS, idx[ok], length,
                                                                  channel_names=CHANNELS, homologous=HOMOLOGOUS_BTE)
     return feats, conn, present
+
+
+def cohort(repo: Path, group: str, lockbox_run: bool = False):
+    """Who is tested and who trains the general part, for a SeizeIT2 run (evaluation methods v1.15).
+
+    development: test the 25 development patients; the general part uses the other development
+    patients only, so the lockbox stays untouched. lockbox: test the 100 lockbox patients; the
+    general part uses all other SeizeIT2 patients. Refused unless lockbox_run is set and the
+    freeze-v1.13 Git tag exists. Returns (subject info dict, test subjects, training pool).
+    """
+    import subprocess
+
+    import yaml
+
+    from ..evaluation.lopo import SubjectInfo
+    split = yaml.safe_load((repo / "configs" / "seizeit2_split.yaml").read_text())
+    if group == "lockbox":
+        tags = subprocess.run(["git", "tag", "-l", "freeze-v1.13"], cwd=repo, capture_output=True, text=True).stdout
+        if not lockbox_run or "freeze-v1.13" not in tags:
+            raise SystemExit("Refusing to touch the lockbox: it is opened only for the single lockbox run, after the "
+                             "freeze (needs --lockbox-run and the freeze-v1.13 Git tag).")
+    dev = {f"seizeit2:{s}" for s in split["development"]}
+    test = {f"seizeit2:{s}" for s in split[group]}
+    pool = test | dev if group == "lockbox" else dev
+    info = {s: SubjectInfo("seizeit2", "train_test", False) for s in pool}
+    return info, test, pool
+

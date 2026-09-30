@@ -2,7 +2,7 @@
 
 | Doc | Version | Author | Written |
 |---|---|---|---|
-| EVM-001 | 1.15 | Kevin Kim | v1.0 before any model was trained; v1.1 and v1.2 after D1, before any D2 result; v1.3 after a one-seed D2 preview; v1.4 after the full D2 run; v1.5 after the personalized variants; v1.6 while the v1.5 test was running, before any v1.6 result; v1.7 before the lockbox audit; v1.8 and v1.9 after it; v1.10 before the final development round; v1.11 before splitting SeizeIT2; v1.12 during the final development round; v1.13 freezes the design; v1.14 is an erratum; v1.15 adds the sensitivity analysis and SeizeIT2 adapter details (see Section 13) |
+| EVM-001 | 1.16 | Kevin Kim | v1.0 before any model was trained; v1.1 and v1.2 after D1, before any D2 result; v1.3 after a one-seed D2 preview; v1.4 after the full D2 run; v1.5 after the personalized variants; v1.6 while the v1.5 test was running, before any v1.6 result; v1.7 before the lockbox audit; v1.8 and v1.9 after it; v1.10 before the final development round; v1.11 before splitting SeizeIT2; v1.12 during the final development round; v1.13 freezes the design; v1.14 is an erratum; v1.15 adds the sensitivity analysis and SeizeIT2 adapter details; v1.16 the dry-run and lockbox commands (see Section 13) |
 
 This document fixes how models are trained, tuned and scored for Deliverables 1 and 2. It adds detail to the verification plan (tag `vtp-1.0`) and doesn't change any of its pass/fail criteria. It is committed before any model is trained so the Git history shows these choices came first. Anything changed after results are seen goes in the version history (Section 11) with a reason.
 
@@ -268,6 +268,14 @@ Neither changes the frozen design.
 * **Development patients:** a feasibility report (`results/seizeit2_dev/feasibility.md`) counts, per development patient, seizures, eligible events, preictal and interictal hours, and whether the patient qualifies for the personalized test.
 * **Next, a dry run:** the frozen design is run on the development patients only, as a check that the full pipeline works on SeizeIT2. Its general part uses the other development patients. It is reported as development, never as the lockbox result.
 
+**Development feasibility (2026-09-30).** The 25 development patients have 538 EEG files. They contain 204 seizures in 169 events, of which 154 are eligible, with the preictal period inside the seizure's own file. There are 76.7 h of preictal and 1,719.9 h of interictal windows. 16 of the 25 patients qualify for the personalized test.
+
+**Dry run and lockbox commands (v1.16).** `scripts/run_personalized.py` and `scripts/run_personalized_alarms.py` take `--dataset seizeit2 --group development`. This runs the frozen design (general + personal, feature set v2, personal baseline, 10 min context, no time of day, plus the frozen alarm settings) on the development patients, with the general part trained on the other development patients.
+
+* **The dry run** uses seed 0 only. It checks that the pipeline works end to end and measures run time; its numbers are reported as development results.
+* **For the lockbox run,** the same commands take `--group lockbox --lockbox-run`, which the scripts refuse without the `freeze-v1.13` tag. The general part is trained on all other SeizeIT2 patients.
+* **Lockbox seeds:** the seeds for the lockbox run will be fixed from the dry run's measured run time, and written here before the lockbox run, never after seeing lockbox results.
+
 ## 12. Lockbox: SeizeIT2 (added in v1.7)
 
 SeizeIT2 v1.1.0 (OpenNeuro ds005873, CC0 licence) was downloaded on 2026-09-28 into `data/raw/seizeit2_v1.1.0/`: 24,877 files, 117.2 GiB. It has 125 patients with focal epilepsy, behind-the-ear EEG and other wearable signals. It is kept sealed until the final design is frozen, so it can give one unbiased test of that design.
@@ -316,3 +324,4 @@ SeizeIT2 v1.1.0 (OpenNeuro ds005873, CC0 licence) was downloaded on 2026-09-28 i
 | 1.13 | 2026-09-30 | Final development round complete (challenger 5: 0.684): design frozen as the base design with 10 min context (Section 11.5), including how it is applied to SeizeIT2, and the remaining steps in order |
 | 1.14 | 2026-09-30 | Erratum: the frontopolar homologous pairs never matched, so the homologous correlation used 6 of 8 pairs; kept as frozen (Section 11.5) |
 | 1.15 | 2026-09-30 | Details of the planned 1 h sensitivity analysis and the SeizeIT2 adapter, including the lockbox guard and the development-patient dry run (Section 11.6); no design change |
+| 1.16 | 2026-09-30 | Development feasibility results; dry-run and lockbox commands; lockbox seeds to be fixed from the dry run's run time before the lockbox run (Section 11.6) |

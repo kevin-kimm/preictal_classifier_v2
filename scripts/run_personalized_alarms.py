@@ -25,6 +25,9 @@ Frozen design (evaluation methods v1.13, Section 11.5):
 Usage, from the repo root with .venv active:
     python scripts/run_personalized_alarms.py                  all variants, five seeds (about 4 h)
     python scripts/run_personalized_alarms.py --frozen         the frozen design
+    python scripts/run_personalized_alarms.py --dataset seizeit2 --seeds 0 1
+                                                               SeizeIT2 development dry run (frozen design);
+                                                               add --group lockbox --lockbox-run only for the lockbox run
     python scripts/run_personalized_alarms.py --seeds 0        quicker look
 
 Outputs: results/d2/personalized_alarms.md and personalized_alarms.csv
@@ -86,24 +89,36 @@ def main():
     ap.add_argument("--features", type=Path, default=None)
     ap.add_argument("--out", type=Path, default=REPO / "results" / "d2")
     ap.add_argument("--frozen", action="store_true")
+    ap.add_argument("--dataset", choices=["chbmit_siena", "seizeit2"], default="chbmit_siena")
+    ap.add_argument("--group", choices=["development", "lockbox"], default="development")
+    ap.add_argument("--lockbox-run", action="store_true")
     args = ap.parse_args()
+    sz2 = args.dataset == "seizeit2"
+    if sz2:
+        args.frozen = True                  # SeizeIT2 is only ever run with the frozen design
     args.out.mkdir(parents=True, exist_ok=True)
     if args.frozen:
         args.variants = [v for v in args.variants if v in ("general", "general_personal")]
         LABELS.update({"general": "Other patients only (frozen design's features and baseline)",
                        "general_personal": "Frozen design: other patients + this patient"})
     if args.features is None:
-        args.features = REPO / "data" / "processed" / ("features_v2" if args.frozen else "features")
-    tag = "_frozen" if args.frozen else ""
+        args.features = REPO / "data" / "processed" / (
+            "features_seizeit2" if sz2 else ("features_v2" if args.frozen else "features"))
+    tag = (f"_seizeit2_{args.group}" if sz2 else "") + ("_frozen" if args.frozen else "")
 
     cfg = load_config()
     rules = LabelRules.from_config(cfg)
     seeds = args.seeds if args.seeds is not None else cfg["evaluation"]["seeds"]
     step_s = cfg["windows"]["step_s"]
-    datasets = tuple(cfg["training"]["datasets"])
+    datasets = ("seizeit2",) if sz2 else tuple(cfg["training"]["datasets"])
     corrections = DEFAULT_CORRECTIONS.read_text() if DEFAULT_CORRECTIONS.exists() else ""
     version = feature_version(cfg, corrections, FEATURE_VERSION_V2 if args.frozen else FEATURE_VERSION)
     subjects = read_label_report(REPO / "results" / "d1" / "label_report.csv")
+    test_subjects = sz_pool = None
+    if sz2:
+        from preictal.data.seizeit2 import FEATURE_CODE, VERSION_TEXT, cohort
+        version = feature_version(cfg, VERSION_TEXT, FEATURE_CODE)
+        subjects, test_subjects, sz_pool = cohort(REPO, args.group, args.lockbox_run)
     tl_info = json.loads((args.features / "timelines.json").read_text())
     kw = dict(sph_s=rules.sph_s, horizon_s=rules.preictal_start_s,
               refractory_s=cfg["alarm"]["refractory_min"] * 60, smoothing=SMOOTHING, persistence=PERSISTENCE)
@@ -154,13 +169,13 @@ def main():
     patients = []
     for code, subject in enumerate(W.subjects):
         info = subjects.get(subject)
-        if info is None or info.role != "train_test":
+        if info is None or info.role != "train_test" or (test_subjects is not None and subject not in test_subjects):
             continue
         rows = np.flatnonzero(W.subject == code)
         events = [(tl, on) for tl in np.unique(W.timeline[rows]) for on in tl_info[W.timelines[tl]]["eligible_onsets"]]
         if len(events) >= 2 and (W.y[rows] == INTERICTAL).sum() * step_s >= 3600:
             patients.append((subject, rows, events))
-    pool = {s for s, i in subjects.items() if i.dataset in datasets and i.role == "train_test"}
+    pool = sz_pool if sz2 else {s for s, i in subjects.items() if i.dataset in datasets and i.role == "train_test"}
     print(f"{len(patients)} patients; variants: {', '.join(args.variants)}")
 
     def seqs_for(rel, scores, t, y, tl, onsets=()):

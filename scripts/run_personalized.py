@@ -29,6 +29,8 @@ Final development round (evaluation methods v1.10, Section 11.4):
     --compare-label TEXT    ... and how to label it
     --train-gap-h H         train with an interictal gap of H hours (evaluation methods v1.12); test
                             windows keep the frozen 4 h gap
+    --dataset seizeit2      run on SeizeIT2 (v1.15): --group development (dry run) or, once, --group
+                            lockbox --lockbox-run; uses data/processed/features_seizeit2
     --test-gap-h H          sensitivity analysis (v1.15): label test windows (and, unless --train-gap-h is
                             given, training windows) with an H hour gap; patients are selected, and the
                             buffer around the held-out seizure is set, with that gap
@@ -121,22 +123,34 @@ def main():
     ap.add_argument("--compare-label", default="feature set v1 with time of day, no baseline")
     ap.add_argument("--train-gap-h", type=float, default=None)
     ap.add_argument("--test-gap-h", type=float, default=None)
+    ap.add_argument("--dataset", choices=["chbmit_siena", "seizeit2"], default="chbmit_siena")
+    ap.add_argument("--group", choices=["development", "lockbox"], default="development")
+    ap.add_argument("--lockbox-run", action="store_true")
     ap.add_argument("--out", type=Path, default=REPO / "results" / "d2")
     args = ap.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
     global CAUTIOUS
     CAUTIOUS = args.cautious_trees
+    sz2 = args.dataset == "seizeit2"
+    if sz2 and (args.train_gap_h is not None or args.test_gap_h is not None or args.feature_set != "v2"):
+        sys.exit("SeizeIT2 runs use the frozen setup: feature set v2 and the main 4 h gap")
     if args.features is None:
-        args.features = REPO / "data" / "processed" / ("features_v2" if args.feature_set == "v2" else "features")
+        args.features = REPO / "data" / "processed" / (
+            "features_seizeit2" if sz2 else ("features_v2" if args.feature_set == "v2" else "features"))
 
     cfg = load_config()
     rules = LabelRules.from_config(cfg)
     seeds = args.seeds if args.seeds is not None else cfg["evaluation"]["seeds"]
     step_s = cfg["windows"]["step_s"]
-    datasets = tuple(cfg["training"]["datasets"])
+    datasets = ("seizeit2",) if sz2 else tuple(cfg["training"]["datasets"])
     corrections = DEFAULT_CORRECTIONS.read_text() if DEFAULT_CORRECTIONS.exists() else ""
     version = feature_version(cfg, corrections, FEATURE_VERSION_V2 if args.feature_set == "v2" else FEATURE_VERSION)
     subjects = read_label_report(REPO / "results" / "d1" / "label_report.csv")
+    test_subjects = sz_pool = None
+    if sz2:
+        from preictal.data.seizeit2 import FEATURE_CODE, VERSION_TEXT, cohort
+        version = feature_version(cfg, VERSION_TEXT, FEATURE_CODE)
+        subjects, test_subjects, sz_pool = cohort(REPO, args.group, args.lockbox_run)
     tl_info = json.loads((args.features / "timelines.json").read_text())
 
     print("Loading features...")
@@ -186,13 +200,13 @@ def main():
     patients = []
     for code, subject in enumerate(W.subjects):
         info = subjects.get(subject)
-        if info is None or info.role != "train_test":
+        if info is None or info.role != "train_test" or (test_subjects is not None and subject not in test_subjects):
             continue
         rows = np.flatnonzero(W.subject == code)
         events = [(tl, on) for tl in np.unique(W.timeline[rows]) for on in tl_info[W.timelines[tl]]["eligible_onsets"]]
         if len(events) >= 2 and (Yte[rows] == INTERICTAL).sum() * step_s >= 3600:
             patients.append((subject, code, rows, events))
-    pool = {s for s, i in subjects.items() if i.dataset in datasets and i.role == "train_test"}
+    pool = sz_pool if sz2 else {s for s, i in subjects.items() if i.dataset in datasets and i.role == "train_test"}
     print(f"{len(patients)} patients; variants: {', '.join(args.variants)}; feature set {args.feature_set}"
           + ("; personal baseline" if args.personal_baseline else ""))
     mats = {"ps_eeg_clock": X_clock, "general": X_clock, "general_personal": X_clock, "ps_eeg_ctx_clock": X_ctx_clock}
@@ -308,7 +322,7 @@ def main():
     for v in args.variants:
         LABELS[v] = (LABELS[v].replace(" + time of day", "") if args.no_clock else LABELS[v]) + suffix
 
-    shown = ["ps_eeg", "ps_clock"] + v1_shown + list(args.variants)
+    shown = ([] if sz2 else ["ps_eeg", "ps_clock"]) + v1_shown + list(args.variants)
     per_patient = defaultdict(lambda: defaultdict(list))
     for r in rows_out:
         for v in shown:
@@ -343,8 +357,8 @@ def main():
              "|---|---|---|---|---|"]
     for v in shown:
         mean, ci = summary(v)
-        p, wins, n = paired(v, "ps_clock") if v != "ps_clock" else (float("nan"), 0, 0)
-        beat = f"{wins} of {n}" if v != "ps_clock" else "–"
+        p, wins, n = paired(v, "ps_clock") if (v != "ps_clock" and "ps_clock" in shown) else (float("nan"), 0, 0)
+        beat = f"{wins} of {n}" if (v != "ps_clock" and "ps_clock" in shown) else "–"
         lines.append(f"| {LABELS[v]} | {mean:.3f} | {ci[0]:.3f}–{ci[1]:.3f} | {beat} | {p:.3g} |")
     comps = [("general_personal", "general"), ("general_personal", "ps_eeg"), ("ps_eeg_clock", "ps_eeg"),
              ("ps_eeg_ctx_clock", "ps_eeg_clock")] + [(v, f"{v}_v1") for v in args.variants]
@@ -358,7 +372,7 @@ def main():
               "| Patient | Seizures | " + " | ".join(LABELS[v] for v in shown) + " |",
               "|---|---|" + "---|" * len(shown)]
     seizures = {r["subject"]: r["seizures"] for r in rows_out}
-    for s in sorted(means, key=lambda s: -means[s].get("general_personal", means[s]["ps_eeg"])):
+    for s in sorted(means, key=lambda s: -means[s].get("general_personal", means[s].get("ps_eeg", 0.0))):
         lines.append(f"| {s} | {seizures[s]} | " + " | ".join(f"{means[s][v]:.3f}" for v in shown) + " |")
     (args.out / f"personalized{args.tag}.md").write_text("\n".join(lines) + "\n")
 
