@@ -29,6 +29,9 @@ Final development round (evaluation methods v1.10, Section 11.4):
     --compare-label TEXT    ... and how to label it
     --train-gap-h H         train with an interictal gap of H hours (evaluation methods v1.12); test
                             windows keep the frozen 4 h gap
+    --test-gap-h H          sensitivity analysis (v1.15): label test windows (and, unless --train-gap-h is
+                            given, training windows) with an H hour gap; patients are selected, and the
+                            buffer around the held-out seizure is set, with that gap
 
 Usage, from the repo root with .venv active:
     python scripts/run_personalized.py                   all variants, five seeds (about 2 h)
@@ -117,6 +120,7 @@ def main():
     ap.add_argument("--compare-to", default="personalized.csv")
     ap.add_argument("--compare-label", default="feature set v1 with time of day, no baseline")
     ap.add_argument("--train-gap-h", type=float, default=None)
+    ap.add_argument("--test-gap-h", type=float, default=None)
     ap.add_argument("--out", type=Path, default=REPO / "results" / "d2")
     args = ap.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
@@ -138,13 +142,21 @@ def main():
     print("Loading features...")
     W = load_windows(args.features, datasets, version=version, keep_per_channel=False)
     clock = clock_features(W.t_end, np.array([timeline_has_clock(k) for k in W.timelines])[W.timeline])
-    Ytr = W.y                                  # labels used for training (test labels always W.y)
+    Yte = W.y                                  # labels for testing and patient selection
+    block_s = rules.interictal_gap_s
+    if args.test_gap_h is not None:
+        test_rules = replace(rules, interictal_gap_s=args.test_gap_h * 3600.0)
+        print(f"  relabeling all windows with a {args.test_gap_h:g} h interictal gap (sensitivity analysis)...")
+        tls = build_timelines(discover(REPO / "data" / "raw", datasets=datasets), test_rules)
+        Yte = relabel(W, tls, test_rules, cfg["windows"]["length_s"], step_s)
+        block_s = test_rules.interictal_gap_s
+    Ytr = Yte                                  # labels used for training
     if args.train_gap_h is not None:
         train_rules = replace(rules, interictal_gap_s=args.train_gap_h * 3600.0)
         print(f"  relabeling training windows with a {args.train_gap_h:g} h interictal gap...")
         tls = build_timelines(discover(REPO / "data" / "raw", datasets=datasets), train_rules)
         Ytr = relabel(W, tls, train_rules, cfg["windows"]["length_s"], step_s)
-        gained = int(((Ytr == INTERICTAL) & (W.y != INTERICTAL)).sum())
+        gained = int(((Ytr == INTERICTAL) & (Yte != INTERICTAL)).sum())
         print(f"  {gained:,} more interictal windows for training ({gained * step_s / 3600:.0f} h)")
     n_clock = 0 if args.no_clock else 2
     base = W.X
@@ -178,7 +190,7 @@ def main():
             continue
         rows = np.flatnonzero(W.subject == code)
         events = [(tl, on) for tl in np.unique(W.timeline[rows]) for on in tl_info[W.timelines[tl]]["eligible_onsets"]]
-        if len(events) >= 2 and (W.y[rows] == INTERICTAL).sum() * step_s >= 3600:
+        if len(events) >= 2 and (Yte[rows] == INTERICTAL).sum() * step_s >= 3600:
             patients.append((subject, code, rows, events))
     pool = {s for s, i in subjects.items() if i.dataset in datasets and i.role == "train_test"}
     print(f"{len(patients)} patients; variants: {', '.join(args.variants)}; feature set {args.feature_set}"
@@ -209,10 +221,10 @@ def main():
     rows_out = []
     it = tqdm(patients, desc="patients") if tqdm else patients
     for subject, code, rows, events in it:
-        t, y, tl = W.t_end[rows], W.y[rows], W.timeline[rows]
+        t, y, tl = W.t_end[rows], Yte[rows], W.timeline[rows]
         ytr = Ytr[rows]
         folds = [(i, tr, te) for i, tr, te in patient_folds(t, y, tl, events, rules.preictal_start_s, rules.sph_s,
-                                                             rules.interictal_gap_s, train_labels=ytr)
+                                                             block_s, train_labels=ytr)
                  if (ytr[tr] == PREICTAL).any() and (ytr[tr] == INTERICTAL).any()]
         others = W.rows(pool - {subject})
         others = others[np.isin(Ytr[others], TRAIN_CLASSES)]
@@ -291,7 +303,8 @@ def main():
               + (f", {args.context_min} min context" if args.context_min else "")
               + (f", personal share {args.personal_share:g}" if args.personal_share != 0.5 else "")
               + (", cautious trees" if args.cautious_trees else "")
-              + (f", trained with a {args.train_gap_h:g} h gap" if args.train_gap_h is not None else "") + ")")
+              + (f", trained with a {args.train_gap_h:g} h gap" if args.train_gap_h is not None else "")
+              + (f", {args.test_gap_h:g} h gap for labels and testing" if args.test_gap_h is not None else "") + ")")
     for v in args.variants:
         LABELS[v] = (LABELS[v].replace(" + time of day", "") if args.no_clock else LABELS[v]) + suffix
 

@@ -141,7 +141,8 @@ def window_features(data: np.ndarray, present: np.ndarray, fs: float, starts: np
 
 
 def connectivity_features(data: np.ndarray, present: np.ndarray, fs: float, starts: np.ndarray,
-                          length: int, warmup: int = 0, batch: int = 64) -> np.ndarray:
+                          length: int, warmup: int = 0, batch: int = 64, channel_names=None,
+                          homologous=None) -> np.ndarray:
     """Connectivity (n_windows x 12) across the derivations present.
 
     For each band (1-40, 4-8 and 13-30 Hz; causal 4th-order Butterworth filter),
@@ -149,14 +150,17 @@ def connectivity_features(data: np.ndarray, present: np.ndarray, fs: float, star
     absolute correlation, the largest eigenvalue as a fraction of the number of channels,
     the normalized entropy of the eigenvalues, and the mean absolute correlation between
     left-right homologous derivations. starts are sample indices into data, which begins
-    `warmup` samples before the first window so the filters can settle.
+    `warmup` samples before the first window so the filters can settle. channel_names and
+    homologous default to the 18 derivations and HOMOLOGOUS; the SeizeIT2 adapter passes its own.
     """
+    channel_names = DERIVATIONS if channel_names is None else channel_names
+    homologous = HOMOLOGOUS if homologous is None else homologous
     idx = np.flatnonzero(present)
     out = np.full((len(starts), len(CONNECTIVITY_FEATURES)), np.nan, dtype=np.float32)
     if len(idx) < 2:
         return out
-    names = [DERIVATIONS[i] for i in idx]
-    pairs = [(names.index(a), names.index(b)) for a, b in HOMOLOGOUS if a in names and b in names]
+    names = [channel_names[i] for i in idx]
+    pairs = [(names.index(a), names.index(b)) for a, b in homologous if a in names and b in names]
     k = len(idx)
     iu = np.triu_indices(k, 1)
     for bi, (lo, hi) in enumerate(CONNECTIVITY_BANDS.values()):
