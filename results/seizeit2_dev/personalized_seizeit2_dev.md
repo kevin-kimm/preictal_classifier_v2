@@ -1,6 +1,6 @@
 # Personalized models (characterization)
 
-Generated 2026-09-30T09:12:13 · seeds [0] · 14 patients · docs/evaluation_methods.md v1.4, Section 11.1 (and v1.6, Section 11.3). Every variant is scored on the same test windows.
+Generated 2026-09-30T20:31:32 · seeds [0] · 14 patients · docs/evaluation_methods.md v1.4, Section 11.1 (and v1.6, Section 11.3). Every variant is scored on the same test windows.
 
 | Model | Mean AUROC | 95% CI | Beats the patient's clock-only model | p (vs clock only) |
 |---|---|---|---|---|

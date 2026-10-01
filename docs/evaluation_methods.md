@@ -2,7 +2,7 @@
 
 | Doc | Version | Author | Written |
 |---|---|---|---|
-| EVM-001 | 1.16 | Kevin Kim | v1.0 before any model was trained; v1.1 and v1.2 after D1, before any D2 result; v1.3 after a one-seed D2 preview; v1.4 after the full D2 run; v1.5 after the personalized variants; v1.6 while the v1.5 test was running, before any v1.6 result; v1.7 before the lockbox audit; v1.8 and v1.9 after it; v1.10 before the final development round; v1.11 before splitting SeizeIT2; v1.12 during the final development round; v1.13 freezes the design; v1.14 is an erratum; v1.15 adds the sensitivity analysis and SeizeIT2 adapter details; v1.16 the dry-run and lockbox commands (see Section 13) |
+| EVM-001 | 1.17 | Kevin Kim | v1.0 before any model was trained; v1.1 and v1.2 after D1, before any D2 result; v1.3 after a one-seed D2 preview; v1.4 after the full D2 run; v1.5 after the personalized variants; v1.6 while the v1.5 test was running, before any v1.6 result; v1.7 before the lockbox audit; v1.8 and v1.9 after it; v1.10 before the final development round; v1.11 before splitting SeizeIT2; v1.12 during the final development round; v1.13 freezes the design; v1.14 is an erratum; v1.15 adds the sensitivity analysis and SeizeIT2 adapter details; v1.16 the dry-run and lockbox commands; v1.17 fixes the lockbox protocol before the lockbox is opened (see Section 13) |
 
 This document fixes how models are trained, tuned and scored for Deliverables 1 and 2. It adds detail to the verification plan (tag `vtp-1.0`) and doesn't change any of its pass/fail criteria. It is committed before any model is trained so the Git history shows these choices came first. Anything changed after results are seen goes in the version history (Section 11) with a reason.
 
@@ -276,6 +276,26 @@ Neither changes the frozen design.
 * **For the lockbox run,** the same commands take `--group lockbox --lockbox-run`, which the scripts refuse without the `freeze-v1.13` tag. The general part is trained on all other SeizeIT2 patients.
 * **Lockbox seeds:** the seeds for the lockbox run will be fixed from the dry run's measured run time, and written here before the lockbox run, never after seeing lockbox results.
 
+**Dry run (2026-09-30, development patients, seed 0).** 14 patients qualified.
+
+* **AUROC:** the frozen design scored 0.669 (95% CI 0.585–0.743), against 0.516 (0.409–0.602) for other patients only. Adding the patient's own data helped in 13 of 14 patients.
+* **Alarms, target ≤ 5 per 24 h:** the frozen design warned 46% of seizures at 4.58 false alarms per 24 h (chance 9%).
+* **Alarms, target ≤ 1 per 24 h:** it warned 20% at 1.71 per 24 h (chance 3.5%).
+* **Other patients only:** alarms were at chance level.
+
+The alarm part took about 2.3 h.
+
+### 11.7 Lockbox protocol (v1.17, fixed before the lockbox is opened)
+
+* **Seeds:** seed 0 only, for both the AUROC part and the alarm part. Scaled from the dry run, the lockbox (about 60 or more qualifying patients, with all 125 patients in the training pool) takes about 12–15 h per seed for the AUROC part and about 2 days per seed for the alarm part. Seeds have changed results by about ±0.007 throughout.
+* **Runner:** `scripts/run_seizeit2.py`. It does the same computations as the dry-run scripts, restructured to fit in memory: context is computed one patient at a time, and only the other patients' training rows are kept. It saves progress after every patient, so an interrupted run resumes.
+* **Check before opening the lockbox:** `--check` reruns chosen development patients and must report identical results to the dry run ("CHECK PASSED") before the lockbox is opened.
+* **Order:**
+  1. extract the lockbox features (`scripts/extract_seizeit2.py --group lockbox --lockbox-run`);
+  2. the AUROC part;
+  3. the alarm part.
+* **Reporting:** results are reported whatever they are, with nothing changed after seeing them. The protocol commit is tagged `lockbox-protocol-v1.17` before the lockbox is opened.
+
 ## 12. Lockbox: SeizeIT2 (added in v1.7)
 
 SeizeIT2 v1.1.0 (OpenNeuro ds005873, CC0 licence) was downloaded on 2026-09-28 into `data/raw/seizeit2_v1.1.0/`: 24,877 files, 117.2 GiB. It has 125 patients with focal epilepsy, behind-the-ear EEG and other wearable signals. It is kept sealed until the final design is frozen, so it can give one unbiased test of that design.
@@ -325,3 +345,4 @@ SeizeIT2 v1.1.0 (OpenNeuro ds005873, CC0 licence) was downloaded on 2026-09-28 i
 | 1.14 | 2026-09-30 | Erratum: the frontopolar homologous pairs never matched, so the homologous correlation used 6 of 8 pairs; kept as frozen (Section 11.5) |
 | 1.15 | 2026-09-30 | Details of the planned 1 h sensitivity analysis and the SeizeIT2 adapter, including the lockbox guard and the development-patient dry run (Section 11.6); no design change |
 | 1.16 | 2026-09-30 | Development feasibility results; dry-run and lockbox commands; lockbox seeds to be fixed from the dry run's run time before the lockbox run (Section 11.6) |
+| 1.17 | 2026-10-01 | Dry-run results; lockbox protocol (seed 0 for both parts, memory-efficient runner checked against the dry run, order of steps) fixed before the lockbox is opened (Section 11.7) |

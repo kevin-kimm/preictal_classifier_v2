@@ -1,11 +1,13 @@
-"""Plot one seizure's lead-up: EEG at 60, 20 and 5 min before onset, and during the seizure.
+"""Plot one seizure's lead-up: EEG at 60, 20 and 5 min before onset, in the last 20 s before the
+5 s cut-off (the last moment a warning still counts), and during the seizure.
 
 A teaching figure, not an analysis: it shows how ordinary the EEG before a seizure usually
 looks compared with the seizure itself. Uses CHB-MIT or Siena (development data) only,
 never SeizeIT2, and doesn't change anything in the frozen design.
 
 The top row shows 20 s of eight temporal-chain derivations at each time point, on the same
-microvolt scale (band-passed 0.5-40 Hz for display). The bottom panel shows how the power at
+microvolt scale (band-passed 0.5-40 Hz for display). Each panel's title gives its typical size:
+the root-mean-square amplitude over the eight channels, in µV, computed before any clipping. The bottom panel shows how the power at
 each frequency evolves over the whole lead-up, averaged over those derivations, with the
 same four time points marked.
 
@@ -40,9 +42,15 @@ from preictal.data.labels import LabelRules, build_timelines  # noqa: E402
 from preictal.data.loaders import discover  # noqa: E402
 
 SHOW = ["Fp1-F7", "F7-T7", "T7-P7", "P7-O1", "Fp2-F8", "F8-T8", "T8-P8", "P8-O2"]
-POINTS = [(-60 * 60, "60 min before"), (-20 * 60, "20 min before"), (-5 * 60, "5 min before"), (15, "during the seizure")]
+POINTS = [(-60 * 60, "60 min before"), (-20 * 60, "20 min before"), (-5 * 60, "5 min before"),
+          (-25, "ending 5 s before"), (15, "during the seizure")]
 SNIPPET_S = 20.0
 LEADUP_S = 65 * 60
+
+
+def dt_label(dt):
+    """x-axis note for the panel close to onset, so its timing is unambiguous."""
+    return f"seconds ({dt:+.0f} to {dt + SNIPPET_S:+.0f} s from onset)" if -120 < dt < 0 else None
 
 
 def covering(tl, t0, t1):
@@ -68,7 +76,7 @@ def main():
 
     rules = LabelRules.from_config(load_config())
     datasets = ("chbmit", "siena") if args.subject is None else (args.subject.split(":")[0],)
-    print("Finding a seizure with 65 min of recorded lead-up...")
+    print("Finding a seizure with 65 min of recorded lead up...")
     timelines = build_timelines(discover(args.data_root, datasets=datasets), rules)
 
     chosen = None
@@ -99,8 +107,8 @@ def main():
         x, fs = segment(p, ev.onset + dt - 5, ev.onset + dt + SNIPPET_S + 5)      # 5 s padding for the filter
         x = sosfiltfilt(sos, np.nan_to_num(x[idx]), axis=1)[:, int(5 * fs):int((5 + SNIPPET_S) * fs)]
         snippets.append((label, x, fs))
-    spread = np.percentile(np.abs(np.concatenate([s[1] for s in snippets[:3]], axis=1)), 99.9)
-    gap = max(2.2 * spread, 50.0)          # spacing set by the three pre-seizure snippets
+    spread = np.percentile(np.abs(np.concatenate([s[1] for s in snippets[:-1]], axis=1)), 99.9)
+    gap = max(2.2 * spread, 50.0)          # spacing set by the pre-seizure snippets
 
     # lead-up spectrogram, piece by piece where recordings cover it
     spec_t, spec_f, spec = [], None, []
@@ -119,20 +127,23 @@ def main():
         spec_t.append((t - ev.onset) / 60)
         t += 60
 
-    fig = plt.figure(figsize=(15, 9.5))
-    gs = fig.add_gridspec(2, 4, height_ratios=[2.2, 1], hspace=0.35, wspace=0.08)
+    n_pan = len(POINTS)
+    fig = plt.figure(figsize=(3.7 * n_pan + 0.5, 9.5))
+    gs = fig.add_gridspec(2, n_pan, height_ratios=[2.2, 1], hspace=0.35, wspace=0.08)
     for k, (label, x, fs) in enumerate(snippets):
+        dt = POINTS[k][0]
         ax = fig.add_subplot(gs[0, k])
         tt = np.arange(x.shape[1]) / fs
         for c in range(x.shape[0]):
             trace = np.clip(x[c], -0.48 * gap, 0.48 * gap)      # keep each channel in its own lane
-            ax.plot(tt, trace - c * gap, color="#c53030" if k == 3 else "#1f2933", lw=0.6)
+            ax.plot(tt, trace - c * gap, color="#c53030" if k == n_pan - 1 else "#1f2933", lw=0.6)
         clipped = (np.abs(x) > 0.48 * gap).mean() > 0.005
-        ax.set_title(label + (" (clipped)" if clipped else ""), fontsize=13,
-                     color="#c53030" if k == 3 else "#1f2933")
+        rms = float(np.sqrt(np.mean(x ** 2)))           # typical size, before any clipping
+        ax.set_title(label + (" (clipped)" if clipped else "") + f"\ntypical size {rms:.0f} µV", fontsize=13,
+                     color="#c53030" if k == n_pan - 1 else "#1f2933")
         ax.set_xlim(0, SNIPPET_S)
         ax.set_ylim(-(len(SHOW) - 0.5) * gap, gap * 0.6)
-        ax.set_xlabel("seconds", fontsize=9)
+        ax.set_xlabel("seconds" if dt_label(POINTS[k][0]) is None else dt_label(POINTS[k][0]), fontsize=9)
         ax.set_yticks([-c * gap for c in range(len(SHOW))])
         ax.set_yticklabels(SHOW if k == 0 else [], fontsize=8.5)
         for s in ("top", "right"):
@@ -154,7 +165,7 @@ def main():
             bbox=dict(facecolor="#f6ad55", edgecolor="none", pad=2))
     ax.set_xlabel("minutes relative to seizure onset", fontsize=10)
     ax.set_ylabel("frequency (Hz)", fontsize=10)
-    ax.set_title("Power at each frequency over the lead-up (brighter = more power; blank = not recorded)",
+    ax.set_title("Power at each frequency over the lead up (brighter = more power, blank = not recorded)",
                  fontsize=11)
     fig.suptitle(f"{tl.subject}, seizure {n}: the EEG before and during a seizure "
                  "(same µV scale in every panel)", fontsize=14)

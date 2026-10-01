@@ -240,6 +240,8 @@ It will be tested once on 100 sealed SeizeIT2 patients (findings F2-07 to F2-15)
 
 A planned sensitivity analysis with a 1-hour gap for normal EEG lowered the frozen design's score on the same 22 patients (0.700 → 0.649), while 11 patients who become testable only under that looser definition scored 0.794. The choice of gap therefore matters by about 0.05, and the 4-hour result stays the main one (F2-15).
 
+**SeizeIT2 dry run.** On 14 SeizeIT2 development patients (behind-the-ear wearable EEG), the frozen design replicated the personalization finding (other patients only 0.516; general + personal 0.669, better for 13 of 14 patients) and warned 46% of seizures at 4.6 false alarms per 24 h. The 100 sealed lockbox patients will give the deciding result (F2-16).
+
 ## Comparison with v1
 
 | Aspect | v1 (AuraSense, final version v6) | v2 |

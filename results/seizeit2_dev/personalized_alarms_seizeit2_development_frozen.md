@@ -1,6 +1,6 @@
 # Personalized designs: alarm-level test (characterization)
 
-Generated 2026-09-30T11:23:44 · seeds [0] · 14 patients · docs/evaluation_methods.md v1.5, Section 11.2. Thresholds chosen from each patient's training data only.
+Generated 2026-09-30T22:46:04 · seeds [0] · 14 patients · docs/evaluation_methods.md v1.5, Section 11.2. Thresholds chosen from each patient's training data only.
 
 | Model | False-alarm target | Seizures warned | False alarms per 24 h | Chance probability | p (vs chance) | Patients with at least one seizure warned |
 |---|---|---|---|---|---|---|
