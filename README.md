@@ -210,7 +210,7 @@ Window-level performance is measured by AUROC (preictal vs interictal) and a thr
 
 | Deliverable | Verification report | Status |
 |---|---|---|
-| 1. Rebuild and first evaluation | [`docs/verification_results/D1.md`](docs/verification_results/D1.md) | VT-01 to VT-13 run (VT-13 failed); VT-14 remaining |
+| 1. Rebuild and first evaluation | [`docs/verification_results/D1.md`](docs/verification_results/D1.md) | VT-01 to VT-14 complete (VT-13 failed) |
 | 2. Final prototype with alarm logic | [`docs/verification_results/D2.md`](docs/verification_results/D2.md) | VT-15 and VT-17 failed, VT-16 passed; patient-specific test reported |
 | 3. Interface and live Cyton test | `docs/verification_results/D3.md` | Not started |
 
@@ -242,15 +242,16 @@ A planned sensitivity analysis with a 1-hour gap for normal EEG lowered the froz
 
 ## Comparison with v1
 
-| Aspect | v1 (AuraSense) | v2 |
+| Aspect | v1 (AuraSense, final version v6) | v2 |
 |---|---|---|
-| Datasets | Siena; EEGMMIDB for false alarm testing | Siena, CHB-MIT, TUSZ; TUAR and mental arithmetic for robustness and false alarm testing |
-| Model | Feature extraction with Keras models, TensorFlow Lite export | Montage-agnostic classifier (to be documented in D1) |
-| Evaluation split | To be filled in from v1 | Cross-patient LOPO |
-| Alarm logic | To be filled in from v1 | Non-repeating alarms with 30 min refractory period |
-| Verification | False alarm rate evaluation | Pre-registered verification plan with pass/fail criteria |
+| Datasets | Siena (12 evaluable patients); EEGMMIDB for false alarm testing | CHB-MIT and Siena for development; TUSZ and mental arithmetic for false alarms; SeizeIT2 sealed for the final test |
+| Labels | preictal 0–5 min before onset; normal more than 30 min from a seizure | preictal 30 min to 5 s before onset; normal at least 4 h from any seizure |
+| Model | dense neural network on 64 band-power features (Keras, TensorFlow Lite export) | gradient boosting on pooled, montage-agnostic features; personalized design (general + personal) frozen for the final test |
+| Evaluation | leave one patient out; best of 297 seeds kept per patient using that patient's test AUC | leave one patient out with pre-set seeds and inner validation; leave one seizure out for the personalized design; sealed final test |
+| Headline result | mean AUC 0.713 (single run 0.568) | cross-patient 0.556 (D1); personalized 0.700 on development data |
+| Verification | false alarm rate evaluation | pre-registered verification plan and evaluation methods with pass/fail criteria |
 
-A detailed comparison, including results, is part of the Deliverable 1 verification report.
+**Why the headline numbers differ.** v6's single run (0.568) agrees with v2's cross-patient baseline (0.556). Its reported 0.713 comes from keeping, for each patient, the best of 297 random seeds judged on that patient's own test results. A simulation (`scripts/demo_best_of_seeds.py`) shows that luck alone produces that number, with no real improvement. A new wearer has no seizures to pick a seed from, so it isn't achievable in practice. v6's proposed patient-specific fine-tuning, meanwhile, matches v2's main finding that personalization is what works. Details are in VT-14 and findings F-25 to F-27 of the [D1 results](docs/verification_results/D1.md).
 
 ## Roadmap
 
@@ -262,7 +263,7 @@ A detailed comparison, including results, is part of the Deliverable 1 verificat
 | 1 | Cross-patient LOPO classifier | 5% | Done (VT-11 passed narrowly) |
 | 1 | Verification test plan, written before testing | 5% | Done (frozen, tag `vtp-1.0`) |
 | 1 | Verification results against the plan | 5% | VT-01 to VT-13 done |
-| 1 | Detailed comparison with v1 | – | Not started |
+| 1 | Detailed comparison with v1 | – | Done (VT-14) |
 | 2 (40%) | Classifier improved by at least 15% over D1 | 10% | Not met: +10.5%, all from the time of day |
 | 2 | Alarm generation logic | 5% | Done (VT-16 passed) |
 | 2 | Event sensitivity and false alarm targets | – | Not met: 16% warned at 5.84 false alarms per 24 h |
