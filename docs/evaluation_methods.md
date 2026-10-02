@@ -2,7 +2,7 @@
 
 | Doc | Version | Author | Written |
 |---|---|---|---|
-| EVM-001 | 1.17 | Kevin Kim | v1.0 before any model was trained; v1.1 and v1.2 after D1, before any D2 result; v1.3 after a one-seed D2 preview; v1.4 after the full D2 run; v1.5 after the personalized variants; v1.6 while the v1.5 test was running, before any v1.6 result; v1.7 before the lockbox audit; v1.8 and v1.9 after it; v1.10 before the final development round; v1.11 before splitting SeizeIT2; v1.12 during the final development round; v1.13 freezes the design; v1.14 is an erratum; v1.15 adds the sensitivity analysis and SeizeIT2 adapter details; v1.16 the dry-run and lockbox commands; v1.17 fixes the lockbox protocol before the lockbox is opened (see Section 13) |
+| EVM-001 | 1.18 | Kevin Kim | v1.0 before any model was trained; v1.1 and v1.2 after D1, before any D2 result; v1.3 after a one-seed D2 preview; v1.4 after the full D2 run; v1.5 after the personalized variants; v1.6 while the v1.5 test was running, before any v1.6 result; v1.7 before the lockbox audit; v1.8 and v1.9 after it; v1.10 before the final development round; v1.11 before splitting SeizeIT2; v1.12 during the final development round; v1.13 freezes the design; v1.14 is an erratum; v1.15 adds the sensitivity analysis and SeizeIT2 adapter details; v1.16 the dry-run and lockbox commands; v1.17 fixes the lockbox protocol before the lockbox is opened; v1.18 records the lockbox AUROC result and changes the alarm part before any alarm result was seen (see Section 13) |
 
 This document fixes how models are trained, tuned and scored for Deliverables 1 and 2. It adds detail to the verification plan (tag `vtp-1.0`) and doesn't change any of its pass/fail criteria. It is committed before any model is trained so the Git history shows these choices came first. Anything changed after results are seen goes in the version history (Section 11) with a reason.
 
@@ -296,6 +296,29 @@ The alarm part took about 2.3 h.
   3. the alarm part.
 * **Reporting:** results are reported whatever they are, with nothing changed after seeing them. The protocol commit is tagged `lockbox-protocol-v1.17` before the lockbox is opened.
 
+### 11.8 Lockbox AUROC result, the check, and the alarm part (v1.18, 2026-10-02)
+
+**AUROC part (seed 0), completed 2026-10-01.** 67 lockbox patients qualified, and 62 had at least one usable fold.
+
+* **The frozen design:** mean per-patient AUROC 0.621 (95% CI 0.564–0.671).
+* **Other patients only:** 0.547 (0.510–0.583).
+* **Adding the patient's own data** helped in 38 of 62 patients.
+
+These are the lockbox AUROC results and are reported as they are.
+
+**The equivalence check.** Two things differ from v1.17's plan:
+
+* **The check came after the AUROC part.** It was run after the lockbox AUROC part, not before the lockbox was opened.
+* **The first attempt compared nothing.** The patient IDs were passed as one shell argument (zsh doesn't split `$SUBS`), so no patient qualified, but the runner still printed "CHECK PASSED". That was a bug. The runner now splits the IDs and fails if any given patient doesn't qualify, or if nothing is compared.
+
+The real check, on development patients sub-001 and sub-002, reproduced all 12 dry-run results exactly (both parts), confirming that the lockbox runner computes the same as the dry-run scripts.
+
+**Alarm part.** After 10 h it had finished 3 of 62 patients (about 3.3 h each), so all 62 would take about 8 more days on the laptop. The protocol is therefore changed as follows, decided before anyone looked at the 3 finished alarm results:
+
+* the alarm part runs on **20 patients drawn at random** (seed 0, `--subset 20`) from the 62 scored in the AUROC part, using only their IDs;
+* any of the 3 finished patients that are drawn are kept; the others are left out of the report;
+* the method is otherwise unchanged, and the report lists the 20 patients.
+
 ## 12. Lockbox: SeizeIT2 (added in v1.7)
 
 SeizeIT2 v1.1.0 (OpenNeuro ds005873, CC0 licence) was downloaded on 2026-09-28 into `data/raw/seizeit2_v1.1.0/`: 24,877 files, 117.2 GiB. It has 125 patients with focal epilepsy, behind-the-ear EEG and other wearable signals. It is kept sealed until the final design is frozen, so it can give one unbiased test of that design.
@@ -346,3 +369,4 @@ SeizeIT2 v1.1.0 (OpenNeuro ds005873, CC0 licence) was downloaded on 2026-09-28 i
 | 1.15 | 2026-09-30 | Details of the planned 1 h sensitivity analysis and the SeizeIT2 adapter, including the lockbox guard and the development-patient dry run (Section 11.6); no design change |
 | 1.16 | 2026-09-30 | Development feasibility results; dry-run and lockbox commands; lockbox seeds to be fixed from the dry run's run time before the lockbox run (Section 11.6) |
 | 1.17 | 2026-10-01 | Dry-run results; lockbox protocol (seed 0 for both parts, memory-efficient runner checked against the dry run, order of steps) fixed before the lockbox is opened (Section 11.7) |
+| 1.18 | 2026-10-02 | Lockbox AUROC result; the equivalence check (run after the AUROC part; first attempt compared nothing, runner fixed; real check identical); alarm part reduced to 20 random patients (seed 0) because of run time, before any alarm result was seen (Section 11.8) |

@@ -15,7 +15,9 @@ Usage, from the repo root with .venv active:
     python scripts/run_seizeit2.py --check sub-001 sub-002          reproduce the dry run for these
                                                                     development patients (must match)
     python scripts/run_seizeit2.py --group lockbox --lockbox-run --part auroc    the lockbox run
-    python scripts/run_seizeit2.py --group lockbox --lockbox-run --part alarms
+    python scripts/run_seizeit2.py --group lockbox --lockbox-run --part alarms [--subset N]
+                                        --subset N: the alarm part on N patients drawn at random (seed 0)
+                                        from those scored in the AUROC part (evaluation methods v1.18)
 
 Outputs: <out>/seizeit2_<group>_<part>.md and .csv, and <out>/seizeit2_<group>_progress.jsonl
 """
@@ -90,11 +92,13 @@ def main():
     ap.add_argument("--seeds", type=int, nargs="+", default=[0])
     ap.add_argument("--check", nargs="+", default=None, metavar="SUB",
                     help="development patients whose dry-run results must be reproduced (both parts)")
+    ap.add_argument("--subset", type=int, default=None, help="alarm part only: N patients drawn at random (seed 0)")
     ap.add_argument("--features", type=Path, default=REPO / "data" / "processed" / "features_seizeit2")
     ap.add_argument("--out", type=Path, default=None)
     args = ap.parse_args()
     if args.check:
         args.group = "development"
+        args.check = [s for item in args.check for s in item.split()]     # zsh passes "a b" as one argument
     args.out = args.out or REPO / "results" / ("lockbox" if args.group == "lockbox" else "seizeit2_dev")
     args.out.mkdir(parents=True, exist_ok=True)
     t_start = time.time()
@@ -150,6 +154,9 @@ def main():
             patients.append((subject, code, rows, events))
     print(f"{len(patients)} patients qualify; part(s): {'auroc and alarms' if args.check else args.part}; "
           f"seeds {args.seeds}")
+    if args.check and len(patients) < len(args.check):
+        sys.exit(f"CHECK FAILED: only {len(patients)} of the {len(args.check)} given patients qualified "
+                 f"({', '.join(args.check)}); nothing was compared for the others")
 
     progress = args.out / f"seizeit2_{args.group if not args.check else 'check'}_progress.jsonl"
     done = {}
@@ -157,6 +164,16 @@ def main():
         for line in progress.read_text().splitlines():
             r = json.loads(line)
             done[(r["part"], r["subject"], r["seed"])] = r
+    subset_note = ""
+    if args.subset and args.part == "alarms" and not args.check:
+        scored = sorted({s for (p, s, seed) in done if p == "auroc" and seed in args.seeds})
+        pool_ids = scored if scored else sorted(s for s, *_ in patients)
+        chosen = set(np.random.default_rng(0).choice(pool_ids, size=min(args.subset, len(pool_ids)),
+                                                     replace=False).tolist())
+        patients = [p for p in patients if p[0] in chosen]
+        subset_note = (f"Alarm part on a random subset of {len(chosen)} of the {len(pool_ids)} patients scored in the "
+                       f"AUROC part (seed 0, evaluation methods v1.18): {', '.join(sorted(chosen))}.")
+        print(subset_note)
     parts = ("auroc", "alarms") if args.check else (args.part,)
 
     def seqs_for(rel, scores, t, y, tl, onsets=()):
@@ -248,7 +265,7 @@ def main():
     # ---------------------------------------------------------------- reports
     names = {s for s, *_ in patients}
     if args.check:
-        ok = True
+        ok, compared = True, 0
         dev = {r["subject"]: r for r in csv.DictReader(open(args.out / "personalized_seizeit2_dev.csv"))
                if int(r["seed"]) in args.seeds}
         alarms = {(r["subject"], r["variant"], float(r["far_target"])): r for r in csv.DictReader(
@@ -260,6 +277,7 @@ def main():
                 for v in VARIANTS:
                     same = abs(r[v] - float(dev[s][v])) < 1e-9
                     ok &= same
+                    compared += 1
                     print(f"{s} AUROC {v:17s} new {r[v]:.6f}  dry run {float(dev[s][v]):.6f}  {'same' if same else 'DIFFERENT'}")
             else:
                 for key, v in r["results"].items():
@@ -267,9 +285,14 @@ def main():
                     old = alarms[(s, var, float(tg))]
                     same = v["warned"] == int(old["warned"]) and v["false_alarms"] == int(old["false_alarms"])
                     ok &= same
+                    compared += 1
                     print(f"{s} alarms {var:17s} ≤{tg}: warned {v['warned']}/{r['seizures']} vs {old['warned']}, "
                           f"false alarms {v['false_alarms']} vs {old['false_alarms']}  {'same' if same else 'DIFFERENT'}")
-        print("\nCHECK PASSED: identical to the dry run" if ok else "\nCHECK FAILED: results differ from the dry run")
+        if compared == 0:
+            ok = False
+            print("\nNothing was compared.")
+        print(f"\nCHECK PASSED: {compared} results identical to the dry run" if ok
+              else "\nCHECK FAILED: results differ from the dry run, or nothing was compared")
         return
 
     recs = [r for (p, s, seed), r in done.items() if p == args.part and s in names and seed in args.seeds]
@@ -277,6 +300,8 @@ def main():
     lines = [f"# SeizeIT2 {args.group}: frozen design, {args.part}", "",
              f"Generated {datetime.now().isoformat(timespec='seconds')} · seeds {args.seeds} · {len(names)} patients · "
              "docs/evaluation_methods.md v1.13 (frozen design) and v1.17 (lockbox protocol).", ""]
+    if subset_note:
+        lines += [subset_note, ""]
     if args.part == "auroc":
         with open(stem.with_suffix(".csv"), "w", newline="") as fh:
             w = csv.DictWriter(fh, fieldnames=["seed", "subject", "seizures", "folds"] + list(VARIANTS),
