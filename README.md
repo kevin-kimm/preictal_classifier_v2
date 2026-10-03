@@ -223,6 +223,8 @@ Window-level performance is measured by AUROC (preictal vs interictal) and a thr
 | Patient-specific AUROC (22 patients, EEG only) | – | 0.662 (95% CI 0.588–0.742) | Not applicable |
 | **Frozen personalized design** (general + personal, no time of day), AUROC on development data | – | 0.700 (95% CI 0.630–0.768; optimistic, chosen on these patients) | Not applicable |
 | Frozen design alarms, target ≤ 5 / ≤ 1 false alarms per 24 h | – | 16% warned at 3.43 per 24 h (chance 7%) / 9% at 1.41 (chance 3%) | – |
+| **Final test: SeizeIT2 lockbox, frozen design AUROC (62 new patients)** | – | **0.621 (95% CI 0.564–0.671); other patients only 0.547** | – |
+| **Final test: SeizeIT2 lockbox alarms, ≤ 5 / ≤ 1 per 24 h (20 random patients)** | – | **38% warned at 5.83 per 24 h (chance 11%) / 18% at 1.69 (chance 3.5%)** | – |
 | Event sensitivity | 0.21 (chance at this rate: 0.20) | 0.16 (chance: 0.11) | Not applicable |
 | False alarms per 24 h, test patients | 10.61 | 5.84 | – |
 | False alarms per 24 h, TUSZ (unseen patients) | 69.67 | 55.2 (held-out half) | – |
@@ -241,6 +243,8 @@ It will be tested once on 100 sealed SeizeIT2 patients (findings F2-07 to F2-15)
 A planned sensitivity analysis with a 1-hour gap for normal EEG lowered the frozen design's score on the same 22 patients (0.700 → 0.649), while 11 patients who become testable only under that looser definition scored 0.794. The choice of gap therefore matters by about 0.05, and the 4-hour result stays the main one (F2-15).
 
 **SeizeIT2 dry run.** On 14 SeizeIT2 development patients (behind-the-ear wearable EEG), the frozen design replicated the personalization finding (other patients only 0.516; general + personal 0.669, better for 13 of 14 patients) and warned 46% of seizures at 4.6 false alarms per 24 h. The 100 sealed lockbox patients will give the deciding result (F2-16).
+
+**Final test (SeizeIT2 lockbox).** On 62 patients the design never saw, the frozen design reached AUROC 0.621 (95% CI 0.564–0.671), against 0.547 for a model trained only on other people. Its alarms warned 38% of seizures at 5.8 false alarms per 24 h, more than 3 times chance. The signal is real but modest, and personal: learning the wearer's own seizures is what makes it work (F2-17).
 
 ## Comparison with v1
 
