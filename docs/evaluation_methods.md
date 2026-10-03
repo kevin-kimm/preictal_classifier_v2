@@ -2,7 +2,7 @@
 
 | Doc | Version | Author | Written |
 |---|---|---|---|
-| EVM-001 | 1.18 | Kevin Kim | v1.0 before any model was trained; v1.1 and v1.2 after D1, before any D2 result; v1.3 after a one-seed D2 preview; v1.4 after the full D2 run; v1.5 after the personalized variants; v1.6 while the v1.5 test was running, before any v1.6 result; v1.7 before the lockbox audit; v1.8 and v1.9 after it; v1.10 before the final development round; v1.11 before splitting SeizeIT2; v1.12 during the final development round; v1.13 freezes the design; v1.14 is an erratum; v1.15 adds the sensitivity analysis and SeizeIT2 adapter details; v1.16 the dry-run and lockbox commands; v1.17 fixes the lockbox protocol before the lockbox is opened; v1.18 records the lockbox AUROC result and changes the alarm part before any alarm result was seen (see Section 13) |
+| EVM-001 | 1.19 | Kevin Kim | v1.0 before any model was trained; v1.1 and v1.2 after D1, before any D2 result; v1.3 after a one-seed D2 preview; v1.4 after the full D2 run; v1.5 after the personalized variants; v1.6 while the v1.5 test was running, before any v1.6 result; v1.7 before the lockbox audit; v1.8 and v1.9 after it; v1.10 before the final development round; v1.11 before splitting SeizeIT2; v1.12 during the final development round; v1.13 freezes the design; v1.14 is an erratum; v1.15 adds the sensitivity analysis and SeizeIT2 adapter details; v1.16 the dry-run and lockbox commands; v1.17 fixes the lockbox protocol before the lockbox is opened; v1.18 records the lockbox AUROC result and changes the alarm part before any alarm result was seen; v1.19 adds the continuous-personalization simulation before running it (see Section 13) |
 
 This document fixes how models are trained, tuned and scored for Deliverables 1 and 2. It adds detail to the verification plan (tag `vtp-1.0`) and doesn't change any of its pass/fail criteria. It is committed before any model is trained so the Git history shows these choices came first. Anything changed after results are seen goes in the version history (Section 11) with a reason.
 
@@ -319,6 +319,26 @@ The real check, on development patients sub-001 and sub-002, reproduced all 12 d
 * any of the 3 finished patients that are drawn are kept; the others are left out of the report;
 * the method is otherwise unchanged, and the report lists the 20 patients.
 
+### 11.9 Continuous personalization, simulated forward in time (v1.19)
+
+This is a characterization. It asks how prediction improves as a device keeps learning its wearer. The frozen recipe is re-run as a device would run it, strictly forward in time, on the 25 SeizeIT2 development patients (seed 0; `scripts/run_learning_curve.py`, step logic in `src/preictal/evaluation/learning_curve.py` and tested in `tests/test_learning_curve.py`).
+
+* **Calibration (step 0).** This is the first 6 h of recording, or up to 30 min before the first eligible seizure if that comes sooner. It must be at least 1 h, otherwise there is no step 0. The personal baseline comes from all non-ictal windows in it, which the device assumes are normal. The device then predicts with the general model until the first seizure.
+* **Retraining (step k).** The device retrains 1 h after the onset of the k-th eligible seizure, using only what it could know by then:
+  * preictal and ictal windows of seizures that have already happened;
+  * interictal windows ending at least 4 h before the retraining time, since only then can they be confirmed as normal.
+
+  The personal baseline comes from those interictal windows. The model is the frozen recipe: other patients plus this patient's windows with half of each class's weight, feature set v2, 10 min context, no time of day.
+* **General part.** It is trained on the other development patients only, so the lockbox patients aren't used and run time stays at a few hours.
+* **Scoring.** Each step is scored from its retraining time until the next eligible seizure, never on anything it was trained on.
+  * *AUROC:* that seizure's preictal windows against the interictal windows in between.
+  * *Alarms:* the frozen settings (36-window smoothing, persistence 6, 30 min refractory, targets 5 and 1 per 24 h). The threshold comes from what the device knew: at step 0, and for the comparison model, from its own training-period windows; for the learning device, from 3 inner chunks of its interictal training windows, as frozen. The next seizure counts as warned if an alarm falls 5 s to 30 min before it.
+* **Comparison.** At every step, the general model with the same updated personal baseline, which never learns seizures, is scored too.
+* **Reporting.** Results are given by the number of seizures learned (0, 1, 2, 3, 4, 5 or more): mean AUROC over steps with a 95% bootstrap interval, alarms pooled, and a learning-curve figure.
+  * *Skipped steps:* a step is skipped when the next seizure comes before retraining; steps with no interictal windows in their test period have no AUROC.
+* **Interpretation.** Later points come only from patients with many seizures, so they describe those patients, not everyone.
+* **When it runs:** after the lockbox alarm part has finished.
+
 ## 12. Lockbox: SeizeIT2 (added in v1.7)
 
 SeizeIT2 v1.1.0 (OpenNeuro ds005873, CC0 licence) was downloaded on 2026-09-28 into `data/raw/seizeit2_v1.1.0/`: 24,877 files, 117.2 GiB. It has 125 patients with focal epilepsy, behind-the-ear EEG and other wearable signals. It is kept sealed until the final design is frozen, so it can give one unbiased test of that design.
@@ -370,3 +390,4 @@ SeizeIT2 v1.1.0 (OpenNeuro ds005873, CC0 licence) was downloaded on 2026-09-28 i
 | 1.16 | 2026-09-30 | Development feasibility results; dry-run and lockbox commands; lockbox seeds to be fixed from the dry run's run time before the lockbox run (Section 11.6) |
 | 1.17 | 2026-10-01 | Dry-run results; lockbox protocol (seed 0 for both parts, memory-efficient runner checked against the dry run, order of steps) fixed before the lockbox is opened (Section 11.7) |
 | 1.18 | 2026-10-02 | Lockbox AUROC result; the equivalence check (run after the AUROC part; first attempt compared nothing, runner fixed; real check identical); alarm part reduced to 20 random patients (seed 0) because of run time, before any alarm result was seen (Section 11.8) |
+| 1.19 | 2026-10-02 | Added the continuous-personalization simulation, forward in time, on the SeizeIT2 development patients (Section 11.9), before running it |

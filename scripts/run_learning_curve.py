@@ -1,0 +1,272 @@
+"""Continuous personalization, simulated forward in time (docs/evaluation_methods.md v1.19).
+
+For each SeizeIT2 development patient, the frozen design's recipe (other patients + this
+patient, feature set v2, personal baseline, 10 min context, no time of day, frozen alarm
+settings) is re-run as a device would: calibrate on the first 6 h, predict with the general
+model until the first seizure, then retrain 1 h after every seizure using only what was known
+by then, and predict until the next one (src/preictal/evaluation/learning_curve.py). Each step
+is scored only on the time after it was trained. A general model with the same personal
+baseline but no personal seizures is scored at every step for comparison.
+
+Usage, from the repo root with .venv active (after the lockbox alarm run has finished):
+    python scripts/run_learning_curve.py
+
+Outputs: results/seizeit2_dev/learning_curve.md and .csv, results/figures/learning_curve.png
+"""
+
+from __future__ import annotations
+
+import argparse
+import csv
+import json
+import sys
+import time
+from collections import defaultdict
+from datetime import datetime
+from pathlib import Path
+
+import numpy as np
+from sklearn.metrics import roc_auc_score
+
+REPO = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO / "src"))
+
+from preictal.config import load_config  # noqa: E402
+from preictal.data.labels import INTERICTAL, PREICTAL, LabelRules  # noqa: E402
+from preictal.data.seizeit2 import FEATURE_CODE, VERSION_TEXT, cohort  # noqa: E402
+from preictal.evaluation.learning_curve import forward_steps  # noqa: E402
+from preictal.evaluation.metrics import Sequence, bootstrap_ci, choose_threshold_bisect, evaluate_all  # noqa: E402
+from preictal.evaluation.patient_specific import inner_interictal_folds  # noqa: E402
+from preictal.features.build_features import feature_version  # noqa: E402
+from preictal.features.transforms import context_features  # noqa: E402
+from preictal.models.model import build_model, predict_proba  # noqa: E402
+from preictal.models.train import TRAIN_CLASSES, blend_weights, load_windows, sample_weights  # noqa: E402
+
+try:
+    from tqdm import tqdm
+except ImportError:
+    tqdm = None
+
+OTHERS_EVERY, CONTEXT_S = 6, 600
+TARGETS = (5.0, 1.0)
+SMOOTHING, PERSISTENCE, WARMUP_S = 36, 6, 300.0
+MODELS = ("personal", "general")
+LABELS = {"personal": "Device that learns each seizure (frozen recipe, retrained after every seizure)",
+          "general": "General model with the personal baseline only (never learns seizures)"}
+
+
+def scale(M, ref):
+    with np.errstate(all="ignore"):
+        med = np.nanmedian(ref, axis=0)
+        iqr = np.maximum(np.nanpercentile(ref, 75, axis=0) - np.nanpercentile(ref, 25, axis=0), 1e-3)
+    return ((M - med) / iqr).astype(np.float32)
+
+
+def fit(X, y, w, seed):
+    model = build_model(seed)
+    model.fit(X, y, sample_weight=w)
+    return model
+
+
+def auroc(y, s):
+    y = np.asarray(y, bool)
+    return float(roc_auc_score(y, s)) if y.any() and (~y).any() else float("nan")
+
+
+def bin_of(k):
+    return str(k) if k < 5 else "5+"
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--features", type=Path, default=REPO / "data" / "processed" / "features_seizeit2")
+    ap.add_argument("--out", type=Path, default=REPO / "results" / "seizeit2_dev")
+    args = ap.parse_args()
+    args.out.mkdir(parents=True, exist_ok=True)
+    t_start = time.time()
+
+    cfg = load_config()
+    rules = LabelRules.from_config(cfg)
+    step_s = cfg["windows"]["step_s"]
+    version = feature_version(cfg, VERSION_TEXT, FEATURE_CODE)
+    _, test_subjects, pool = cohort(REPO, "development")
+    tl_info = json.loads((args.features / "timelines.json").read_text())
+    kw = dict(sph_s=rules.sph_s, horizon_s=rules.preictal_start_s, refractory_s=cfg["alarm"]["refractory_min"] * 60,
+              smoothing=SMOOTHING, persistence=PERSISTENCE)
+    n_cand = cfg["alarm"]["threshold_candidates"]
+
+    print("Loading features...")
+    W = load_windows(args.features, ("seizeit2",), version=version, keep_per_channel=False)
+
+    def patient_matrix(rows):
+        ctx = context_features(W.X[rows], W.timeline[rows], W.t_end[rows], CONTEXT_S)
+        return np.hstack([W.X[rows], ctx]).astype(np.float32)
+
+    print("Preparing the other development patients' training rows...")
+    parts_X, parts_y, parts_s = [], [], []
+    for code in [c for c, s in enumerate(W.subjects) if s in pool]:
+        rows = np.flatnonzero(W.subject == code)
+        M = patient_matrix(rows)
+        ref = W.y[rows] == INTERICTAL
+        S = scale(M, M[ref]) if ref.any() else M
+        keep = np.isin(W.y[rows], TRAIN_CLASSES) & (np.round(W.t_end[rows] / 5.0).astype(np.int64) % OTHERS_EVERY == 0)
+        parts_X.append(S[keep]); parts_y.append(W.y[rows][keep]); parts_s.append(np.full(keep.sum(), code, np.int32))
+    O_X, O_y, O_s = np.vstack(parts_X), np.concatenate(parts_y), np.concatenate(parts_s)
+    del parts_X
+
+    def seqs_for(rel, scores, t, y, tl, onsets=()):
+        out = []
+        order = np.lexsort((t[rel], tl[rel]))
+        rel, scores = rel[order], scores[order]
+        for c in np.unique(tl[rel]):
+            m = tl[rel] == c
+            on = np.array(onsets, float)
+            out.append(Sequence("", t[rel][m], scores[m], y[rel][m], on, on))
+        return out
+
+    rows_out = []
+    subjects = [(c, s) for c, s in enumerate(W.subjects) if s in test_subjects]
+    it = tqdm(subjects, desc="patients") if tqdm else subjects
+    for code, subject in it:
+        rows = np.flatnonzero(W.subject == code)
+        if len(np.unique(W.timeline[rows])) != 1:
+            continue
+        t, y, tl = W.t_end[rows], W.y[rows], W.timeline[rows]
+        onsets = sorted(tl_info[W.timelines[tl[0]]]["eligible_onsets"])
+        steps = forward_steps(t, y, onsets, rules.preictal_start_s, rules.sph_s, rules.interictal_gap_s)
+        if not steps:
+            continue
+        M = patient_matrix(rows)
+        others = O_s != code
+        Xo, yo, so = O_X[others], O_y[others], O_s[others]
+        general = fit(Xo, yo, sample_weights(yo, so), args.seed)
+
+        for st in steps:
+            base = st.baseline if len(st.baseline) else st.train[~np.isin(y[st.train], (PREICTAL,))]
+            if len(base) == 0:
+                continue
+            P = scale(M, M[base])
+            models = {"general": general}
+            if st.k == 0:
+                models["personal"] = general                     # nothing learned yet: the device is the general model
+            else:
+                tr = st.train[np.isin(y[st.train], TRAIN_CLASSES)]
+                wg, wp = blend_weights(yo, so, y[tr], 0.5)
+                models["personal"] = fit(np.vstack([Xo, P[tr]]), np.concatenate([yo, y[tr]]),
+                                         np.concatenate([wg, wp]), args.seed)
+            test = st.test
+            pre_mask = y[test] == PREICTAL
+            rec = {"subject": subject, "k": st.k, "test_preictal": int(pre_mask.sum()),
+                   "test_interictal": int((~pre_mask).sum())}
+            for name, model in models.items():
+                rec[f"auroc_{name}"] = auroc(pre_mask, predict_proba(model, P[test])[:, 0])
+                # threshold from what the device knew at this step
+                if st.k == 0 or name == "general":
+                    ref_rows = st.baseline if st.k == 0 else st.train[y[st.train] == INTERICTAL]
+                    inner = seqs_for(ref_rows, predict_proba(model, P[ref_rows])[:, 0], t, y, tl) if len(ref_rows) else []
+                else:
+                    inner = []
+                    for inner_train, inner_chunk in inner_interictal_folds(t, y, tl, st.train):
+                        ib = inner_train[y[inner_train] == INTERICTAL]
+                        if len(ib) == 0:
+                            continue
+                        P_in = scale(M, M[ib])
+                        itr = inner_train[np.isin(y[inner_train], TRAIN_CLASSES)]
+                        wg, wp = blend_weights(yo, so, y[itr], 0.5)
+                        m_in = fit(np.vstack([Xo, P_in[itr]]), np.concatenate([yo, y[itr]]),
+                                   np.concatenate([wg, wp]), args.seed)
+                        inner += seqs_for(inner_chunk, predict_proba(m_in, P_in[inner_chunk])[:, 0], t, y, tl)
+                pre_rel = np.flatnonzero((t > st.cutoff) & (t >= st.next_onset - rules.preictal_start_s - WARMUP_S)
+                                         & (t <= st.next_onset - rules.sph_s))
+                inter_rel = test[~pre_mask]
+                for tg in TARGETS:
+                    key = f"{name}_{tg:g}"
+                    if not inner or len(pre_rel) == 0:
+                        rec[f"warned_{key}"], rec[f"fa_{key}"], rec[f"hours_{key}"] = float("nan"), 0, 0.0
+                        continue
+                    thr, _ = choose_threshold_bisect(inner, tg, step_s, n_cand, **kw)
+                    warned = evaluate_all(seqs_for(pre_rel, predict_proba(model, P[pre_rel])[:, 0], t, y, tl,
+                                                   [st.next_onset]), thr, step_s, **kw)
+                    fa = (evaluate_all(seqs_for(inter_rel, predict_proba(model, P[inter_rel])[:, 0], t, y, tl),
+                                       thr, step_s, **kw) if len(inter_rel) else None)
+                    rec[f"warned_{key}"] = min(warned.n_predicted, 1)
+                    rec[f"fa_{key}"] = fa.n_false if fa else 0
+                    rec[f"hours_{key}"] = fa.far_hours if fa else 0.0
+            rows_out.append(rec)
+
+    # ---------------------------------------------------------------- summary, report and figure
+    fields = sorted({k for r in rows_out for k in r}, key=lambda k: (k not in ("subject", "k"), k))
+    with open(args.out / "learning_curve.csv", "w", newline="") as fh:
+        w = csv.DictWriter(fh, fieldnames=fields, lineterminator="\n")
+        w.writeheader()
+        w.writerows(rows_out)
+    bins = ["0", "1", "2", "3", "4", "5+"]
+    by_bin = defaultdict(list)
+    for r in rows_out:
+        by_bin[bin_of(r["k"])].append(r)
+    lines = ["# Continuous personalization, simulated forward in time (SeizeIT2 development patients)", "",
+             f"Generated {datetime.now().isoformat(timespec='seconds')} · seed {args.seed} · "
+             f"{len({r['subject'] for r in rows_out})} patients, {len(rows_out)} steps · "
+             "docs/evaluation_methods.md v1.19. Each step is scored only on the time after it was trained.", "",
+             "| Seizures learned | Steps | AUROC, learning device | AUROC, general + baseline only | "
+             "Warned (≤ 5 / 24 h), learning device | False alarms / 24 h | Warned, general only | False alarms / 24 h |",
+             "|---|---|---|---|---|---|---|---|"]
+    curve = {m: [] for m in MODELS}
+    for b in bins:
+        rs = by_bin.get(b, [])
+        if not rs:
+            continue
+        cells = []
+        for m in MODELS:
+            vals = [r[f"auroc_{m}"] for r in rs if not np.isnan(r[f"auroc_{m}"])]
+            mean = float(np.mean(vals)) if vals else float("nan")
+            ci = bootstrap_ci(vals, 1000, 0) if vals else (float("nan"), float("nan"))
+            curve[m].append((b, mean, ci, len(vals)))
+            cells.append(f"{mean:.3f} ({ci[0]:.2f}–{ci[1]:.2f}, n={len(vals)})")
+        alarm_cells = []
+        for m in MODELS:
+            ws = [r[f"warned_{m}_5"] for r in rs if not np.isnan(r[f"warned_{m}_5"])]
+            fa = sum(r[f"fa_{m}_5"] for r in rs)
+            hrs = sum(r[f"hours_{m}_5"] for r in rs)
+            alarm_cells += [f"{np.mean(ws):.2f} (n={len(ws)})" if ws else "–",
+                            f"{24 * fa / hrs:.2f}" if hrs else "–"]
+        lines.append(f"| {b} | {len(rs)} | {cells[0]} | {cells[1]} | {alarm_cells[0]} | {alarm_cells[1]} "
+                     f"| {alarm_cells[2]} | {alarm_cells[3]} |")
+    (args.out / "learning_curve.md").write_text("\n".join(lines) + "\n")
+
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    fig, ax = plt.subplots(figsize=(8.5, 4.6))
+    colors = {"personal": "#2b6cb0", "general": "#a0aec0"}
+    for m in MODELS:
+        pts = [(i, mean, ci) for i, (b, mean, ci, n) in enumerate(curve[m]) if not np.isnan(mean)]
+        if not pts:
+            continue
+        xs, ys, cis = zip(*pts)
+        ax.plot(xs, ys, marker="o", color=colors[m], lw=2.2, label=LABELS[m])
+        ax.fill_between(xs, [c[0] for c in cis], [c[1] for c in cis], color=colors[m], alpha=0.15)
+    ax.axhline(0.5, color="#1f2933", lw=1, ls="--")
+    ax.text(0.02, 0.505, "coin flip", fontsize=9, color="#6b7785")
+    ax.set_xticks(range(len(curve["personal"])))
+    ax.set_xticklabels([b for b, *_ in curve["personal"]])
+    ax.set_xlabel("seizures the device has learned from", fontsize=10.5)
+    ax.set_ylabel("AUROC on the time that follows", fontsize=10.5)
+    ax.set_title("Simulated device that keeps learning its wearer (SeizeIT2 development patients)", fontsize=11.5)
+    ax.legend(fontsize=9, frameon=False, loc="lower right")
+    for s in ("top", "right"):
+        ax.spines[s].set_visible(False)
+    fig.tight_layout()
+    figs = REPO / "results" / "figures"
+    figs.mkdir(parents=True, exist_ok=True)
+    fig.savefig(figs / "learning_curve.png", dpi=170)
+
+    print()
+    print("\n".join(lines[5:]))
+    print(f"\nReport: {args.out / 'learning_curve.md'}; figure: {figs / 'learning_curve.png'}  "
+          f"({(time.time() - t_start) / 60:.0f} min)")
+
+
+if __name__ == "__main__":
+    main()
