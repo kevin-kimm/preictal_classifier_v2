@@ -17,6 +17,14 @@ preictal_classifier_v2 is a ground-up rebuild of the AuraSense seizure predictio
 | Alarm logic | Converts the continuous risk score into discrete, non-repeating alarms, to limit alarm fatigue. |
 | User interface | Runs locally. Replays dataset recordings or streams live Cyton data, showing the EEG, risk score, alarms and alarm times. |
 
+## Key results
+
+* **Prediction across patients doesn't work.** A model trained on other people and tested on someone new is at or near chance from brain waves alone (AUROC 0.556 in D1; 0.614 in D2, almost all of it from the time of day).
+* **Personalization works.** A model that also learns the person's own earlier seizures does clearly better, and the gain held on every dataset.
+* **The final test was on new patients with wearable EEG.** On 62 sealed SeizeIT2 patients with behind-the-ear sensors, the frozen design reached AUROC 0.621 (95% CI 0.564–0.671) against 0.547 without personal data. Its alarms warned 38% of seizures at 5.83 false alarms per 24 h, more than 3 times chance.
+* **A device that keeps learning its wearer predicts better over time,** but its alarm thresholds need to keep adapting too: false alarms rose to 13.8 per 24 h.
+* **It isn't a usable warning device yet.** The course target (80% of seizures at ≤ 5 false alarms per 24 h) was not met. The evidence points to a continuously personalizing device as the way forward; see the [D2 final analysis](docs/final_analysis.md).
+
 ## Intended use (draft)
 
 *Software that analyzes continuous scalp EEG from a person with epilepsy and alerts that person when a seizure is likely to begin within the next 30 minutes and at least 5 seconds before onset, so they can move to a safe place or follow their seizure action plan.*
@@ -194,17 +202,37 @@ pip install -e .
 | 1. Data audit | `scripts/audit_data.py` | Done (VT-01 passed) |
 | 2. Harmonization | `src/preictal/data/harmonize.py` | Done (VT-02 to VT-05 passed) |
 | 3. Relabeling | `src/preictal/data/labels.py` | Done (VT-06, VT-07 passed) |
-| 4. Model and LOPO training | `src/preictal/models/`, `src/preictal/evaluation/lopo.py` | Planned |
-| 5. Alarm logic | `src/preictal/alarm/alarm.py` | Planned |
-| 6. Replay and live interface | `src/preictal/ui/app.py`, `src/preictal/live/cyton.py` | Planned |
+| 4. Features (v1 and v2) | `src/preictal/features/` | Done |
+| 5. Model, cross-patient training and evaluation | `src/preictal/models/`, `src/preictal/evaluation/`, `scripts/run_lopo.py`, `scripts/run_d2.py` | Done (D1, D2) |
+| 6. Alarm logic | `src/preictal/alarm/alarm.py` | Done (VT-16 passed) |
+| 7. Personalized designs and the frozen design | `scripts/run_personalized.py`, `scripts/run_personalized_alarms.py` | Done (frozen, tag `freeze-v1.13`) |
+| 8. SeizeIT2 adapter and lockbox | `src/preictal/data/seizeit2.py`, `scripts/extract_seizeit2.py`, `scripts/run_seizeit2.py` | Done (final test reported) |
+| 9. Continuous-personalization simulation | `src/preictal/evaluation/learning_curve.py`, `scripts/run_learning_curve.py` | Done |
+| 10. Replay and live interface | `scripts/cyton_check.py` (connection check); interface to come | D3 |
 
 Tunable parameters, including the preictal window, sampling rate, alarm refractory period and random seeds, are read from `configs/default.yaml`. Parameters fixed by the verification plan are marked there.
 
 ## Evaluation protocol
 
-Models are evaluated with cross-patient leave-one-patient-out (LOPO) validation over the 25 eligible test patients: each patient is scored by a model that never saw any of their data. D1 models are trained on CHB-MIT and Siena. The full setup, fixed before any model was trained, is in [`docs/evaluation_methods.md`](docs/evaluation_methods.md). If the number of eligible patients makes LOPO impractical on a laptop, patient-grouped 10-fold cross-validation is used instead, under a rule fixed in advance (decision D-6 in the verification plan). Five random seeds are fixed in advance and all five are reported. Alarm thresholds are chosen on a validation subset of the training patients only, never on the test patient.
+Personalized designs are evaluated by leaving one seizure out at a time within each patient, with buffers so that nothing near the test seizure is trained on. Choices between designs were made by nested selection or by rules fixed in advance, and the final design was tested once on sealed data (the SeizeIT2 lockbox). Cross-patient models are evaluated with leave-one-patient-out (LOPO) validation over the 25 eligible test patients: each patient is scored by a model that never saw any of their data. D1 models are trained on CHB-MIT and Siena. The full setup, fixed before any model was trained, is in [`docs/evaluation_methods.md`](docs/evaluation_methods.md). If the number of eligible patients makes LOPO impractical on a laptop, patient-grouped 10-fold cross-validation is used instead, under a rule fixed in advance (decision D-6 in the verification plan). Five random seeds are fixed in advance and all five are reported. Alarm thresholds are chosen on a validation subset of the training patients only, never on the test patient.
 
 Window-level performance is measured by AUROC (preictal vs interictal) and a three-class confusion matrix. Event-level performance is measured by the fraction of seizures warned in time, false alarms per 24 hours, time spent in warning, and warning time, and is compared with a random predictor raising alarms at the same rate. Exact definitions and pass/fail criteria are in the [verification plan](docs/verification_plan.md).
+
+## Tests
+
+186 automated tests run with `python -m pytest -q` from the repository root (about 5 seconds). They cover:
+
+* EDF reading and channel harmonization;
+* labeling rules and timelines;
+* features (checked against known signals and `scipy.signal.welch`);
+* the alarm logic (VT-16);
+* fold construction and leakage checks (VT-08);
+* metric definitions;
+* the patient-specific and forward-in-time splits, including that nothing from the future is trained on;
+* the neural network (with a numerical gradient check);
+* the SeizeIT2 adapter.
+
+Long verification runs have their own scripts and write their evidence to `results/`. The README itself is checked by `scripts/check_readme.py` (VT-20).
 
 ## Verification and results
 
@@ -246,6 +274,8 @@ A planned sensitivity analysis with a 1-hour gap for normal EEG lowered the froz
 
 **Final test (SeizeIT2 lockbox).** On 62 patients the design never saw, the frozen design reached AUROC 0.621 (95% CI 0.564–0.671), against 0.547 for a model trained only on other people. Its alarms warned 38% of seizures at 5.8 false alarms per 24 h, more than 3 times chance. The signal is real but modest, and personal: learning the wearer's own seizures is what makes it work (F2-17).
 
+**A device that keeps learning.** Simulated forward in time on the SeizeIT2 development patients, a device that retrains after each of the wearer's seizures predicted better than one that never learns (AUROC 0.606 against 0.454 on the same periods; better in 26 of 31, p = 0.0015). It warned 38% of seizures against 16%, but at 13.8 false alarms per 24 h, so alarm thresholds would need to keep adapting too (F2-18).
+
 ## Comparison with v1
 
 | Aspect | v1 (AuraSense, final version v6) | v2 |
@@ -268,15 +298,16 @@ A planned sensitivity analysis with a 1-hour gap for normal EEG lowered the froz
 | 1 | Relabeled corpus (30 min to 5 s before onset) | 5% | Done |
 | 1 | Cross-patient LOPO classifier | 5% | Done (VT-11 passed narrowly) |
 | 1 | Verification test plan, written before testing | 5% | Done (frozen, tag `vtp-1.0`) |
-| 1 | Verification results against the plan | 5% | VT-01 to VT-13 done |
+| 1 | Verification results against the plan | 5% | VT-01 to VT-14 done |
 | 1 | Detailed comparison with v1 | – | Done (VT-14) |
 | 2 (40%) | Classifier improved by at least 15% over D1 | 10% | Not met: +10.5%, all from the time of day |
 | 2 | Alarm generation logic | 5% | Done (VT-16 passed) |
 | 2 | Event sensitivity and false alarm targets | – | Not met: 16% warned at 5.84 false alarms per 24 h |
 | 2 | Personalized designs and final development round (added) | – | Done; design frozen (`freeze-v1.13`) |
-| 2 | SeizeIT2 lockbox test of the frozen design (added) | – | Audit and split done; adapter next |
-| 2 | Final analysis of results | 10% | In progress |
-| 2 | README | 15% | In progress |
+| 2 | SeizeIT2 lockbox test of the frozen design (added) | – | Done: AUROC 0.621, alarms 38% at 5.83 per 24 h |
+| 2 | Continuous-personalization simulation (added) | – | Done (F2-18) |
+| 2 | Final analysis of results | 10% | Done ([final_analysis.md](docs/final_analysis.md)) |
+| 2 | README | 15% | Checked by `scripts/check_readme.py` (VT-20) |
 | 3 (20%) | Local interface showing dataset replay and alarms | 10% | Not started |
 | 3 | Real-time Cyton acquisition, live baseline, seizure-free recording | – | Not started |
 | 3 | Analysis report compared with D1 and D2 | 10% | Not started |
