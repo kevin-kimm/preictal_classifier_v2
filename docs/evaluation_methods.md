@@ -2,7 +2,7 @@
 
 | Doc | Version | Author | Written |
 |---|---|---|---|
-| EVM-001 | 1.19 | Kevin Kim | v1.0 before any model was trained; v1.1 and v1.2 after D1, before any D2 result; v1.3 after a one-seed D2 preview; v1.4 after the full D2 run; v1.5 after the personalized variants; v1.6 while the v1.5 test was running, before any v1.6 result; v1.7 before the lockbox audit; v1.8 and v1.9 after it; v1.10 before the final development round; v1.11 before splitting SeizeIT2; v1.12 during the final development round; v1.13 freezes the design; v1.14 is an erratum; v1.15 adds the sensitivity analysis and SeizeIT2 adapter details; v1.16 the dry-run and lockbox commands; v1.17 fixes the lockbox protocol before the lockbox is opened; v1.18 records the lockbox AUROC result and changes the alarm part before any alarm result was seen; v1.19 adds the continuous-personalization simulation before running it (see Section 13) |
+| EVM-001 | 1.20 | Kevin Kim | v1.0 before any model was trained; v1.1 and v1.2 after D1, before any D2 result; v1.3 after a one-seed D2 preview; v1.4 after the full D2 run; v1.5 after the personalized variants; v1.6 while the v1.5 test was running, before any v1.6 result; v1.7 before the lockbox audit; v1.8 and v1.9 after it; v1.10 before the final development round; v1.11 before splitting SeizeIT2; v1.12 during the final development round; v1.13 freezes the design; v1.14 is an erratum; v1.15 adds the sensitivity analysis and SeizeIT2 adapter details; v1.16 the dry-run and lockbox commands; v1.17 fixes the lockbox protocol before the lockbox is opened; v1.18 records the lockbox AUROC result and changes the alarm part before any alarm result was seen; v1.19 adds the continuous-personalization simulation before running it; v1.20 starts v3 development with adaptive thresholds (see Section 13) |
 
 This document fixes how models are trained, tuned and scored for Deliverables 1 and 2. It adds detail to the verification plan (tag `vtp-1.0`) and doesn't change any of its pass/fail criteria. It is committed before any model is trained so the Git history shows these choices came first. Anything changed after results are seen goes in the version history (Section 11) with a reason.
 
@@ -339,6 +339,29 @@ This is a characterization. It asks how prediction improves as a device keeps le
 * **Interpretation.** Later points come only from patients with many seizures, so they describe those patients, not everyone.
 * **When it runs:** after the lockbox alarm part has finished.
 
+### 11.10 v3 development: adaptive alarm thresholds (v1.20)
+
+**Status of v3.** The SeizeIT2 lockbox has been used for v2's final test, so it can no longer give an untouched estimate. Every v3 result is a development result, labeled that way, and none of them changes v2's reported results. A fresh final test for v3 would need new data.
+
+**Why adaptive thresholds.** The main failure in the lockbox and in the forward-in-time simulation was that false alarms exceeded their targets: 5.8 per 24 h against 5 on the lockbox, and 13.8 in the simulation. A threshold set once, at retraining, doesn't follow the wearer's changing EEG.
+
+**Method.** This uses the simulation of Section 11.9 (`scripts/run_learning_curve.py --adaptive --tag _adaptive`), with the same models, seed 0 and patients. Each step's alarms are evaluated twice:
+
+* **Fixed:** the threshold set at retraining, as in v1.19.
+* **Adaptive:** the threshold is recalibrated every 6 h after retraining, with the same rule as at retraining (the lowest of 1,000 candidates with a false-alarm rate at most the target). It is recalibrated on the model's scores for the wearer's recent confirmed-normal EEG:
+  * *Which EEG:* interictal windows from the 24 h ending 4 h before recalibration, and only after the last retraining, so the model was never trained on them.
+  * *Minimum:* if there are fewer than 2 h of them, the previous threshold is kept.
+  * *Before the first recalibration,* the threshold from retraining is used.
+
+Both models (the learning device and the never-learning comparison) and both targets (5 and 1 per 24 h) are evaluated. The AUROC results are recomputed and must match the v1.19 run exactly, which checks that the run is reproducible.
+
+**Decision rule, fixed in advance.** The primary comparison is the learning device at the ≤ 5 target, over all steps after at least one learned seizure. Adaptive thresholds count as an improvement if:
+
+* the false-alarm rate is closer to the target than with the fixed threshold (or at or below it), and
+* the share of seizures warned still beats chance (p < 0.05).
+
+The ≤ 1 target and the never-learning model are reported as secondary results.
+
 ## 12. Lockbox: SeizeIT2 (added in v1.7)
 
 SeizeIT2 v1.1.0 (OpenNeuro ds005873, CC0 licence) was downloaded on 2026-09-28 into `data/raw/seizeit2_v1.1.0/`: 24,877 files, 117.2 GiB. It has 125 patients with focal epilepsy, behind-the-ear EEG and other wearable signals. It is kept sealed until the final design is frozen, so it can give one unbiased test of that design.
@@ -391,3 +414,4 @@ SeizeIT2 v1.1.0 (OpenNeuro ds005873, CC0 licence) was downloaded on 2026-09-28 i
 | 1.17 | 2026-10-01 | Dry-run results; lockbox protocol (seed 0 for both parts, memory-efficient runner checked against the dry run, order of steps) fixed before the lockbox is opened (Section 11.7) |
 | 1.18 | 2026-10-02 | Lockbox AUROC result; the equivalence check (run after the AUROC part; first attempt compared nothing, runner fixed; real check identical); alarm part reduced to 20 random patients (seed 0) because of run time, before any alarm result was seen (Section 11.8) |
 | 1.19 | 2026-10-02 | Added the continuous-personalization simulation, forward in time, on the SeizeIT2 development patients (Section 11.9), before running it |
+| 1.20 | 2026-10-03 | v3 development begins (development results only; the lockbox is used). Adaptive alarm thresholds, recalibrated every 6 h on recent confirmed-normal EEG, with a decision rule fixed in advance (Section 11.10) |

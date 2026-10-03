@@ -92,3 +92,13 @@ def test_persistence_run_length():
     from preictal.alarm.alarm import candidates
     x = np.array([0, 1, 1, 0, 1, 1, 1, 1], dtype=float)
     assert candidates(x, 0.5, persistence=3).tolist() == [False] * 6 + [True, True]
+
+
+def test_time_varying_threshold():
+    from preictal.evaluation.metrics import evaluate_all_varying
+    s = seq(12)
+    s.scores[[100, 4000, 8000]] = 0.7               # three spikes, far apart
+    same = evaluate_all_varying([s], lambda t: np.full(len(t), 0.5), STEP)
+    assert same.n_false == evaluate_alarms(s, 0.5, STEP).n_false == 3
+    raised = evaluate_all_varying([s], lambda t: np.where(t > 6 * 3600, 0.9, 0.5), STEP)
+    assert raised.n_false == 2                      # the threshold rose before the third spike

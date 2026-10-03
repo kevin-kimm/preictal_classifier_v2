@@ -8,8 +8,14 @@ by then, and predict until the next one (src/preictal/evaluation/learning_curve.
 is scored only on the time after it was trained. A general model with the same personal
 baseline but no personal seizures is scored at every step for comparison.
 
+Adaptive thresholds (evaluation methods v1.20, a v3 development experiment): with --adaptive,
+every step's alarms are also evaluated with a threshold that is recalibrated every 6 h on the
+wearer's recent confirmed-normal EEG (the 24 h ending 4 h before recalibration, after the last
+retraining, at least 2 h of it), alongside the fixed threshold.
+
 Usage, from the repo root with .venv active (after the lockbox alarm run has finished):
     python scripts/run_learning_curve.py
+    python scripts/run_learning_curve.py --adaptive --tag _adaptive
 
 Outputs: results/seizeit2_dev/learning_curve.md and .csv, results/figures/learning_curve.png
 """
@@ -35,7 +41,9 @@ from preictal.config import load_config  # noqa: E402
 from preictal.data.labels import INTERICTAL, PREICTAL, LabelRules  # noqa: E402
 from preictal.data.seizeit2 import FEATURE_CODE, VERSION_TEXT, cohort  # noqa: E402
 from preictal.evaluation.learning_curve import forward_steps  # noqa: E402
-from preictal.evaluation.metrics import Sequence, bootstrap_ci, choose_threshold_bisect, evaluate_all  # noqa: E402
+from preictal.evaluation.metrics import (  # noqa: E402
+    Sequence, bootstrap_ci, chance_p_value, choose_threshold_bisect, evaluate_all, evaluate_all_varying,
+)
 from preictal.evaluation.patient_specific import inner_interictal_folds  # noqa: E402
 from preictal.features.build_features import feature_version  # noqa: E402
 from preictal.features.transforms import context_features  # noqa: E402
@@ -82,7 +90,10 @@ def main():
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--features", type=Path, default=REPO / "data" / "processed" / "features_seizeit2")
     ap.add_argument("--out", type=Path, default=REPO / "results" / "seizeit2_dev")
+    ap.add_argument("--adaptive", action="store_true")
+    ap.add_argument("--tag", default="")
     args = ap.parse_args()
+    RECAL_S, REF_S, MIN_REF_S = 6 * 3600.0, 24 * 3600.0, 2 * 3600.0
     args.out.mkdir(parents=True, exist_ok=True)
     t_start = time.time()
 
@@ -184,6 +195,9 @@ def main():
                     key = f"{name}_{tg:g}"
                     if not inner or len(pre_rel) == 0:
                         rec[f"warned_{key}"], rec[f"fa_{key}"], rec[f"hours_{key}"] = float("nan"), 0, 0.0
+                        if args.adaptive:
+                            rec[f"warned_{key}_adaptive"], rec[f"fa_{key}_adaptive"] = float("nan"), 0
+                            rec[f"hours_{key}_adaptive"], rec[f"recalibrations_{key}"] = 0.0, 0
                         continue
                     thr, _ = choose_threshold_bisect(inner, tg, step_s, n_cand, **kw)
                     warned = evaluate_all(seqs_for(pre_rel, predict_proba(model, P[pre_rel])[:, 0], t, y, tl,
@@ -193,11 +207,39 @@ def main():
                     rec[f"warned_{key}"] = min(warned.n_predicted, 1)
                     rec[f"fa_{key}"] = fa.n_false if fa else 0
                     rec[f"hours_{key}"] = fa.far_hours if fa else 0.0
+                    if args.adaptive:
+                        # recalibrate every 6 h on recent confirmed-normal EEG seen since retraining (never trained on)
+                        s_inter = predict_proba(model, P[inter_rel])[:, 0] if len(inter_rel) else np.array([])
+                        times_k, thr_k = [st.cutoff], [thr]
+                        r = st.cutoff + RECAL_S
+                        while r < st.next_onset:
+                            hi = r - rules.interictal_gap_s
+                            ref = (t[inter_rel] > max(st.cutoff, hi - REF_S)) & (t[inter_rel] <= hi) if len(inter_rel) \
+                                else np.zeros(0, bool)
+                            if ref.sum() * step_s >= MIN_REF_S:
+                                new_thr, _ = choose_threshold_bisect(seqs_for(inter_rel[ref], s_inter[ref], t, y, tl),
+                                                                     tg, step_s, n_cand, **kw)
+                                times_k.append(r)
+                                thr_k.append(new_thr)
+                            r += RECAL_S
+                        times_k, thr_k = np.array(times_k), np.array(thr_k)
+
+                        def thr_at(tt, times_k=times_k, thr_k=thr_k):
+                            return thr_k[np.clip(np.searchsorted(times_k, tt, side="right") - 1, 0, len(thr_k) - 1)]
+
+                        wa = evaluate_all_varying(seqs_for(pre_rel, predict_proba(model, P[pre_rel])[:, 0], t, y, tl,
+                                                           [st.next_onset]), thr_at, step_s, **kw)
+                        fa_a = (evaluate_all_varying(seqs_for(inter_rel, s_inter, t, y, tl), thr_at, step_s, **kw)
+                                if len(inter_rel) else None)
+                        rec[f"warned_{key}_adaptive"] = min(wa.n_predicted, 1)
+                        rec[f"fa_{key}_adaptive"] = fa_a.n_false if fa_a else 0
+                        rec[f"hours_{key}_adaptive"] = fa_a.far_hours if fa_a else 0.0
+                        rec[f"recalibrations_{key}"] = len(thr_k) - 1
             rows_out.append(rec)
 
     # ---------------------------------------------------------------- summary, report and figure
     fields = sorted({k for r in rows_out for k in r}, key=lambda k: (k not in ("subject", "k"), k))
-    with open(args.out / "learning_curve.csv", "w", newline="") as fh:
+    with open(args.out / f"learning_curve{args.tag}.csv", "w", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=fields, lineterminator="\n")
         w.writeheader()
         w.writerows(rows_out)
@@ -233,7 +275,24 @@ def main():
                             f"{24 * fa / hrs:.2f}" if hrs else "–"]
         lines.append(f"| {b} | {len(rs)} | {cells[0]} | {cells[1]} | {alarm_cells[0]} | {alarm_cells[1]} "
                      f"| {alarm_cells[2]} | {alarm_cells[3]} |")
-    (args.out / "learning_curve.md").write_text("\n".join(lines) + "\n")
+    if args.adaptive:
+        lines += ["", "## Fixed and adaptive thresholds, over all steps after at least one learned seizure", "",
+                  "| Model | Threshold | Target | Seizures warned | False alarms / 24 h | Chance | p |",
+                  "|---|---|---|---|---|---|---|"]
+        after = [r for r in rows_out if r["k"] >= 1]
+        for m in MODELS:
+            for mode in ("", "_adaptive"):
+                for tg in TARGETS:
+                    key = f"{m}_{tg:g}{mode}"
+                    ws = [r[f"warned_{key}"] for r in after if not np.isnan(r[f"warned_{key}"])]
+                    fa = sum(r[f"fa_{key}"] for r in after)
+                    hrs = sum(r[f"hours_{key}"] for r in after)
+                    far = 24 * fa / hrs if hrs else float("nan")
+                    c, pv = chance_p_value(int(sum(ws)), len(ws), far, rules.preictal_start_s - rules.sph_s)
+                    lines.append(f"| {'learning device' if m == 'personal' else 'never learns'} | "
+                                 f"{'adaptive' if mode else 'fixed'} | ≤ {tg:g} | {int(sum(ws))}/{len(ws)} "
+                                 f"({np.mean(ws):.2f}) | {far:.2f} | {c:.3f} | {pv:.3g} |")
+    (args.out / f"learning_curve{args.tag}.md").write_text("\n".join(lines) + "\n")
 
     import matplotlib
     matplotlib.use("Agg")
@@ -260,11 +319,11 @@ def main():
     fig.tight_layout()
     figs = REPO / "results" / "figures"
     figs.mkdir(parents=True, exist_ok=True)
-    fig.savefig(figs / "learning_curve.png", dpi=170)
+    fig.savefig(figs / f"learning_curve{args.tag}.png", dpi=170)
 
     print()
     print("\n".join(lines[5:]))
-    print(f"\nReport: {args.out / 'learning_curve.md'}; figure: {figs / 'learning_curve.png'}  "
+    print(f"\nReport: {args.out / f'learning_curve{args.tag}.md'}; figure: {figs / f'learning_curve{args.tag}.png'}  "
           f"({(time.time() - t_start) / 60:.0f} min)")
 
 

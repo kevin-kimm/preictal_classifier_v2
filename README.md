@@ -220,7 +220,7 @@ Window-level performance is measured by AUROC (preictal vs interictal) and a thr
 
 ## Tests
 
-186 automated tests run with `python -m pytest -q` from the repository root (about 5 seconds). They cover:
+187 automated tests run with `python -m pytest -q` from the repository root (about 5 seconds). They cover:
 
 * EDF reading and channel harmonization;
 * labeling rules and timelines;

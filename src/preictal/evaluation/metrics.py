@@ -96,6 +96,14 @@ def evaluate_all(seqs: list[Sequence], threshold: float, step_s: float, **kw) ->
     return total
 
 
+def evaluate_all_varying(seqs: list[Sequence], threshold_at, step_s: float, **kw) -> AlarmResult:
+    """Like evaluate_all, with a threshold that changes over time: threshold_at(times) -> one value per window."""
+    total = AlarmResult()
+    for s in seqs:
+        total = total.add(evaluate_alarms(s, np.asarray(threshold_at(s.times), dtype=float), step_s, **kw))
+    return total
+
+
 def false_alarm_rate(seqs: list[Sequence], threshold: float, step_s: float, sph_s: float = 5.0,
                      horizon_s: float = 1800.0, refractory_s: float = 1800.0, smoothing: int = 1,
                      persistence: int = 1) -> float:

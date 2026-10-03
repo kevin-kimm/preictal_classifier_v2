@@ -1,6 +1,6 @@
 # VT-20 README check
 
-Generated 2026-10-03T11:33:15 with `scripts/check_readme.py`.
+Generated 2026-10-03T11:46:30 with `scripts/check_readme.py`.
 
 **Result: PASS** (17 of 17 checks)
 
@@ -11,7 +11,7 @@ Generated 2026-10-03T11:33:15 with `scripts/check_readme.py`.
 | Section: Tests run | pass | `## Tests` |
 | Section: Verification metrics | pass | `## Verification and results` |
 | Section: Current model metrics | pass | `### Current model metrics` |
-| Test count matches pytest | pass | pytest collects 186; README must say "186 automated tests" |
+| Test count matches pytest | pass | pytest collects 187; README must say "187 automated tests" |
 | D1 cross-patient AUROC | pass | results file says 0.556 |
 | D2 cross-patient AUROC | pass | results file says 0.614 |
 | Patient-specific AUROC | pass | results file says 0.662 |
