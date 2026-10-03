@@ -2,7 +2,7 @@
 
 | Doc | Version | Author | Written |
 |---|---|---|---|
-| EVM-001 | 1.20 | Kevin Kim | v1.0 before any model was trained; v1.1 and v1.2 after D1, before any D2 result; v1.3 after a one-seed D2 preview; v1.4 after the full D2 run; v1.5 after the personalized variants; v1.6 while the v1.5 test was running, before any v1.6 result; v1.7 before the lockbox audit; v1.8 and v1.9 after it; v1.10 before the final development round; v1.11 before splitting SeizeIT2; v1.12 during the final development round; v1.13 freezes the design; v1.14 is an erratum; v1.15 adds the sensitivity analysis and SeizeIT2 adapter details; v1.16 the dry-run and lockbox commands; v1.17 fixes the lockbox protocol before the lockbox is opened; v1.18 records the lockbox AUROC result and changes the alarm part before any alarm result was seen; v1.19 adds the continuous-personalization simulation before running it; v1.20 starts v3 development with adaptive thresholds (see Section 13) |
+| EVM-001 | 1.21 | Kevin Kim | v1.0 before any model was trained; v1.1 and v1.2 after D1, before any D2 result; v1.3 after a one-seed D2 preview; v1.4 after the full D2 run; v1.5 after the personalized variants; v1.6 while the v1.5 test was running, before any v1.6 result; v1.7 before the lockbox audit; v1.8 and v1.9 after it; v1.10 before the final development round; v1.11 before splitting SeizeIT2; v1.12 during the final development round; v1.13 freezes the design; v1.14 is an erratum; v1.15 adds the sensitivity analysis and SeizeIT2 adapter details; v1.16 the dry-run and lockbox commands; v1.17 fixes the lockbox protocol before the lockbox is opened; v1.18 records the lockbox AUROC result and changes the alarm part before any alarm result was seen; v1.19 adds the continuous-personalization simulation before running it; v1.20 starts v3 development with adaptive thresholds; v1.21 records that result and adds the false-alarm breakdown (see Section 13) |
 
 This document fixes how models are trained, tuned and scored for Deliverables 1 and 2. It adds detail to the verification plan (tag `vtp-1.0`) and doesn't change any of its pass/fail criteria. It is committed before any model is trained so the Git history shows these choices came first. Anything changed after results are seen goes in the version history (Section 11) with a reason.
 
@@ -232,7 +232,7 @@ Only the 10 min context is at least 0.01 above the base, so there is no combinat
 
 **Applying it to SeizeIT2 (the lockbox).**
 
-* **Channels:** the behind-the-ear EEG channels present (`BTEleft SD`, `BTEright SD`, `CROSStop SD`), resampled from 250 to 256 Hz, are the "derivations". Features are pooled over the channels present. For connectivity, `BTEleft SD` and `BTEright SD` form the left-right homologous pair when both are present.
+* **Channels:** the behind-the-ear EEG channels present (`BTEleft SD`, `BTEright SD`, `CROSStop SD`), resampled to 256 Hz where a file uses another rate (erratum, v1.21: the text said "from 250 Hz", but files can already be at 256 Hz; the code resamples from each file's own rate), are the "derivations". Features are pooled over the channels present. For connectivity, `BTEleft SD` and `BTEright SD` form the left-right homologous pair when both are present.
 * **Seizures:** annotation rows whose `eventType` starts with `sz` are seizures (onset and duration from the file). Other rows are ignored.
 * **Timeline:** clock times are anonymized, so each patient's files are placed back to back in run-number order. Distances used for the 4 h normal-EEG rule are measured on this timeline; real breaks between files can only make true distances longer, so normal EEG stays at least 4 h from any seizure. Preictal windows come only from the same file as their seizure, and the 90% rule is applied within that file.
 * **Other patients** for the general part are all other SeizeIT2 patients (development and lockbox), never the test patient. Everything else is as above.
@@ -262,7 +262,7 @@ Neither changes the frozen design.
 **SeizeIT2 adapter** (`src/preictal/data/seizeit2.py`, `scripts/extract_seizeit2.py`, tested in `tests/test_seizeit2.py`). These are technical details of the rules in Section 11.5:
 
 * **Files:** each subject's `ses-*/eeg/*_eeg.edf` files are ordered by session and run number from the file names, and the seizures are read from the matching `_events.tsv`.
-* **Signals:** the channels are matched by exact label and converted to µV using the EDF physical units. They are resampled from 250 to 256 Hz with the same polyphase resampler as the other datasets, read in 1 h pieces with 2 s of padding and 10 s of filter warm-up, as in feature set v2. A channel that's absent is left out of pooling, as elsewhere.
+* **Signals:** the channels are matched by exact label and converted to µV using the EDF physical units. They are resampled from each file's own rate to 256 Hz (unchanged if it is already 256 Hz) with the same polyphase resampler as the other datasets, read in 1 h pieces with 2 s of padding and 10 s of filter warm-up, as in feature set v2. A channel that's absent is left out of pooling, as elsewhere.
 * **Features:** the feature version is `d2-v2-bte`. Features go to `data/processed/features_seizeit2/`, with timeline keys `seizeit2|sub-XXX`.
 * **Lockbox guard:** the extraction script refuses lockbox patients unless it is given `--lockbox-run` and the `freeze-v1.13` Git tag exists.
 * **Development patients:** a feasibility report (`results/seizeit2_dev/feasibility.md`) counts, per development patient, seizures, eligible events, preictal and interictal hours, and whether the patient qualifies for the personalized test.
@@ -362,6 +362,49 @@ Both models (the learning device and the never-learning comparison) and both tar
 
 The ≤ 1 target and the never-learning model are reported as secondary results.
 
+**Result (2026-10-03).** The AUROC results and the fixed-threshold alarms reproduced the v1.19 run exactly. Over the 95 seizures after at least one learned seizure, for the learning device:
+
+| Thresholds | Target | Warned | False alarms per 24 h | Chance | p |
+|---|---|---|---|---|---|
+| Fixed | ≤ 5 | 36/95 (38%) | 13.77 | 0.249 | 0.0034 |
+| Adaptive | ≤ 5 | 33/95 (35%) | 10.24 | 0.192 | 0.00026 |
+| Fixed | ≤ 1 | 22/95 (23%) | 9.18 | 0.174 | 0.091 |
+| Adaptive | ≤ 1 | 23/95 (24%) | 6.00 | 0.117 | 0.00052 |
+
+**Decision.** By the decision rule, adaptive thresholds count as an improvement: false alarms came closer to the target (10.24 against 13.77, target 5) while warnings still beat chance. The never-learning model gained nothing (16% against 14% warned, both at chance). False alarms remain well above both targets.
+
+### 11.11 v3 development: false-alarm breakdown (v1.21)
+
+**Status.** This is a diagnostic, not a verification test. It describes where false alarms come from in the forward-in-time simulation (Sections 11.9 and 11.10), and changes no model, threshold or alarm rule. Any change it motivates needs its own written plan, added to this document before it is run.
+
+**What is logged.** The simulation is rerun with `--adaptive --log-alarms --tag _breakdown` (same seed, same models; its counts must equal the earlier run's). Every alarm is written to `results/seizeit2_dev/alarm_log_breakdown.csv`: true and false alarms, under fixed and adaptive thresholds, for both models and both targets (≤ 5 and ≤ 1 per 24 h). For each alarm it records:
+
+* **Learning stage:** hours since monitoring started, seizures learned so far, hours since the last retraining, and hours since the last threshold recalibration.
+* **Patient:** the subject ID, the file and the time within it, to see whether a few patients produce most of the false alarms.
+* **Signal quality** in the 5 min before the alarm, computed afterwards by `scripts/breakdown_false_alarms.py`:
+  * *movement:* the variability of the accelerometer magnitude, from SeizeIT2's `mov` recording of the same run;
+  * *muscle:* the EMG RMS above 20 Hz, from the `emg` recording;
+  * *EEG muscle index:* 30–45 Hz power on the behind-the-ear channels, which is always available.
+
+  The `mov` and `emg` files are assumed to share the EEG file's start and timing (the same run). A measure that can't be read is left out and counted.
+* **Clock time:** not available, since SeizeIT2's times are anonymized (F2-14).
+
+**What is reported.**
+
+1. False alarms per 24 h by learning stage (1, 2, 3, 4, or 5 or more seizures learned) and by time since retraining (0–6 h, 6–24 h, more than 24 h).
+2. The share of false alarms from the 3 patients with the most, and per-patient false-alarm rates.
+3. For each measure, the share of false alarms during high activity, meaning above the same patient's 90th percentile in 150 randomly sampled normal-EEG windows (seed 0). That compares with the 10% expected by chance (one-sided binomial test).
+4. All of the above side by side for fixed and adaptive thresholds, with a check that the logged false alarms equal the simulation's own counts.
+
+**Candidate follow-up experiments.** Each needs its own amendment and decision rule before it is run:
+
+* **Warm-up:** no personal-model alarms until a minimum amount of confirmed-normal EEG has been seen, with a stricter threshold until then.
+* **Artifact gating:** windows with high movement or muscle activity can't contribute to an alarm.
+* **Stricter persistence:** a longer time above threshold before an alarm fires, reported with its cost in warned seizures.
+* **Personal time prior:** a record of when this person's own seizures occur, combined with the EEG risk score. CHB-MIT and Siena only, since SeizeIT2 has no clock. It must be compared against a personal clock-only model.
+
+All results are reported as seizures warned at ≤ 1 and ≤ 5 false alarms per 24 h, against random alarms at the same rate, and labeled as v3 development results.
+
 ## 12. Lockbox: SeizeIT2 (added in v1.7)
 
 SeizeIT2 v1.1.0 (OpenNeuro ds005873, CC0 licence) was downloaded on 2026-09-28 into `data/raw/seizeit2_v1.1.0/`: 24,877 files, 117.2 GiB. It has 125 patients with focal epilepsy, behind-the-ear EEG and other wearable signals. It is kept sealed until the final design is frozen, so it can give one unbiased test of that design.
@@ -415,3 +458,4 @@ SeizeIT2 v1.1.0 (OpenNeuro ds005873, CC0 licence) was downloaded on 2026-09-28 i
 | 1.18 | 2026-10-02 | Lockbox AUROC result; the equivalence check (run after the AUROC part; first attempt compared nothing, runner fixed; real check identical); alarm part reduced to 20 random patients (seed 0) because of run time, before any alarm result was seen (Section 11.8) |
 | 1.19 | 2026-10-02 | Added the continuous-personalization simulation, forward in time, on the SeizeIT2 development patients (Section 11.9), before running it |
 | 1.20 | 2026-10-03 | v3 development begins (development results only; the lockbox is used). Adaptive alarm thresholds, recalibrated every 6 h on recent confirmed-normal EEG, with a decision rule fixed in advance (Section 11.10) |
+| 1.21 | 2026-10-03 | Adaptive-threshold result and decision (an improvement by the pre-set rule); false-alarm breakdown plan (Section 11.11); erratum on SeizeIT2 sampling rates |

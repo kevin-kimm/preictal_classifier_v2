@@ -16,6 +16,8 @@ retraining, at least 2 h of it), alongside the fixed threshold.
 Usage, from the repo root with .venv active (after the lockbox alarm run has finished):
     python scripts/run_learning_curve.py
     python scripts/run_learning_curve.py --adaptive --tag _adaptive
+    python scripts/run_learning_curve.py --adaptive --log-alarms --tag _breakdown
+                     (v1.21: also writes every alarm, with its timing, to alarm_log<tag>.csv)
 
 Outputs: results/seizeit2_dev/learning_curve.md and .csv, results/figures/learning_curve.png
 """
@@ -37,6 +39,7 @@ from sklearn.metrics import roc_auc_score
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "src"))
 
+from preictal.alarm.alarm import alarm_times  # noqa: E402
 from preictal.config import load_config  # noqa: E402
 from preictal.data.labels import INTERICTAL, PREICTAL, LabelRules  # noqa: E402
 from preictal.data.seizeit2 import FEATURE_CODE, VERSION_TEXT, cohort  # noqa: E402
@@ -92,6 +95,7 @@ def main():
     ap.add_argument("--out", type=Path, default=REPO / "results" / "seizeit2_dev")
     ap.add_argument("--adaptive", action="store_true")
     ap.add_argument("--tag", default="")
+    ap.add_argument("--log-alarms", action="store_true")
     args = ap.parse_args()
     RECAL_S, REF_S, MIN_REF_S = 6 * 3600.0, 24 * 3600.0, 2 * 3600.0
     args.out.mkdir(parents=True, exist_ok=True)
@@ -136,7 +140,28 @@ def main():
             out.append(Sequence("", t[rel][m], scores[m], y[rel][m], on, on))
         return out
 
-    rows_out = []
+    rows_out, alarm_log = [], []
+
+    def log_alarms(seqs, thr, *, subject, k, model, mode, target, true_window, t_first, cutoff, recal, rows_p, t_p):
+        """Every alarm in these sequences, with when it happened in the device's life (v1.21)."""
+        order = np.argsort(t_p)
+        for s in seqs:
+            th = thr(s.times) if callable(thr) else thr
+            for a in alarm_times(s.times, s.scores, th, kw["refractory_s"], SMOOTHING, PERSISTENCE):
+                if true_window is not None and not (true_window[0] <= a <= true_window[1]):
+                    continue
+                j = order[np.searchsorted(t_p[order], a)]
+                g = rows_p[j]
+                last_recal = max([r for r in recal if r <= a], default=cutoff)
+                alarm_log.append({
+                    "subject": subject, "k": k, "model": model, "thresholds": mode, "target": target,
+                    "false": true_window is None, "t": round(float(a), 1),
+                    "recording": W.recordings[W.recording[g]] if W.recordings is not None else "",
+                    "s_into_recording": round(float(W.starts[g] + L), 1) if W.starts is not None else float("nan"),
+                    "h_since_start": round((a - t_first) / 3600, 3), "h_since_retraining": round((a - cutoff) / 3600, 3),
+                    "h_since_recalibration": round((a - last_recal) / 3600, 3)})
+
+    L = cfg["windows"]["length_s"]
     subjects = [(c, s) for c, s in enumerate(W.subjects) if s in test_subjects]
     it = tqdm(subjects, desc="patients") if tqdm else subjects
     for code, subject in it:
@@ -170,6 +195,10 @@ def main():
             pre_mask = y[test] == PREICTAL
             rec = {"subject": subject, "k": st.k, "test_preictal": int(pre_mask.sum()),
                    "test_interictal": int((~pre_mask).sum())}
+            since = (t[test[~pre_mask]] - st.cutoff) / 3600
+            rec["inter_h_0_6"] = float(((since >= 0) & (since < 6)).sum() * step_s / 3600)
+            rec["inter_h_6_24"] = float(((since >= 6) & (since < 24)).sum() * step_s / 3600)
+            rec["inter_h_24p"] = float((since >= 24).sum() * step_s / 3600)
             for name, model in models.items():
                 rec[f"auroc_{name}"] = auroc(pre_mask, predict_proba(model, P[test])[:, 0])
                 # threshold from what the device knew at this step
@@ -207,6 +236,15 @@ def main():
                     rec[f"warned_{key}"] = min(warned.n_predicted, 1)
                     rec[f"fa_{key}"] = fa.n_false if fa else 0
                     rec[f"hours_{key}"] = fa.far_hours if fa else 0.0
+                    common = dict(subject=subject, k=st.k, model=name, target=tg, t_first=float(t.min() - L),
+                                  cutoff=st.cutoff, rows_p=rows, t_p=t)
+                    if args.log_alarms:
+                        pre_seqs = seqs_for(pre_rel, predict_proba(model, P[pre_rel])[:, 0], t, y, tl, [st.next_onset])
+                        win = (st.next_onset - rules.preictal_start_s, st.next_onset - rules.sph_s)
+                        log_alarms(pre_seqs, thr, mode="fixed", true_window=win, recal=[], **common)
+                        if len(inter_rel):
+                            log_alarms(seqs_for(inter_rel, predict_proba(model, P[inter_rel])[:, 0], t, y, tl), thr,
+                                       mode="fixed", true_window=None, recal=[], **common)
                     if args.adaptive:
                         # recalibrate every 6 h on recent confirmed-normal EEG seen since retraining (never trained on)
                         s_inter = predict_proba(model, P[inter_rel])[:, 0] if len(inter_rel) else np.array([])
@@ -231,6 +269,14 @@ def main():
                                                            [st.next_onset]), thr_at, step_s, **kw)
                         fa_a = (evaluate_all_varying(seqs_for(inter_rel, s_inter, t, y, tl), thr_at, step_s, **kw)
                                 if len(inter_rel) else None)
+                        if args.log_alarms:
+                            log_alarms(seqs_for(pre_rel, predict_proba(model, P[pre_rel])[:, 0], t, y, tl,
+                                                [st.next_onset]), thr_at, mode="adaptive",
+                                       true_window=(st.next_onset - rules.preictal_start_s,
+                                                    st.next_onset - rules.sph_s), recal=list(times_k[1:]), **common)
+                            if len(inter_rel):
+                                log_alarms(seqs_for(inter_rel, s_inter, t, y, tl), thr_at, mode="adaptive",
+                                           true_window=None, recal=list(times_k[1:]), **common)
                         rec[f"warned_{key}_adaptive"] = min(wa.n_predicted, 1)
                         rec[f"fa_{key}_adaptive"] = fa_a.n_false if fa_a else 0
                         rec[f"hours_{key}_adaptive"] = fa_a.far_hours if fa_a else 0.0
@@ -293,6 +339,12 @@ def main():
                                  f"{'adaptive' if mode else 'fixed'} | ≤ {tg:g} | {int(sum(ws))}/{len(ws)} "
                                  f"({np.mean(ws):.2f}) | {far:.2f} | {c:.3f} | {pv:.3g} |")
     (args.out / f"learning_curve{args.tag}.md").write_text("\n".join(lines) + "\n")
+    if args.log_alarms:
+        with open(args.out / f"alarm_log{args.tag}.csv", "w", newline="") as fh:
+            w = csv.DictWriter(fh, fieldnames=list(alarm_log[0]) if alarm_log else ["subject"], lineterminator="\n")
+            w.writeheader()
+            w.writerows(alarm_log)
+        print(f"Alarm log: {args.out / f'alarm_log{args.tag}.csv'} ({len(alarm_log)} alarms)")
 
     import matplotlib
     matplotlib.use("Agg")
