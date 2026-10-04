@@ -2,7 +2,7 @@
 
 | Doc | Version | Author | Written |
 |---|---|---|---|
-| EVM-001 | 1.21 | Kevin Kim | v1.0 before any model was trained; v1.1 and v1.2 after D1, before any D2 result; v1.3 after a one-seed D2 preview; v1.4 after the full D2 run; v1.5 after the personalized variants; v1.6 while the v1.5 test was running, before any v1.6 result; v1.7 before the lockbox audit; v1.8 and v1.9 after it; v1.10 before the final development round; v1.11 before splitting SeizeIT2; v1.12 during the final development round; v1.13 freezes the design; v1.14 is an erratum; v1.15 adds the sensitivity analysis and SeizeIT2 adapter details; v1.16 the dry-run and lockbox commands; v1.17 fixes the lockbox protocol before the lockbox is opened; v1.18 records the lockbox AUROC result and changes the alarm part before any alarm result was seen; v1.19 adds the continuous-personalization simulation before running it; v1.20 starts v3 development with adaptive thresholds; v1.21 records that result and adds the false-alarm breakdown (see Section 13) |
+| EVM-001 | 1.22 | Kevin Kim | v1.0 before any model was trained; v1.1 and v1.2 after D1, before any D2 result; v1.3 after a one-seed D2 preview; v1.4 after the full D2 run; v1.5 after the personalized variants; v1.6 while the v1.5 test was running, before any v1.6 result; v1.7 before the lockbox audit; v1.8 and v1.9 after it; v1.10 before the final development round; v1.11 before splitting SeizeIT2; v1.12 during the final development round; v1.13 freezes the design; v1.14 is an erratum; v1.15 adds the sensitivity analysis and SeizeIT2 adapter details; v1.16 the dry-run and lockbox commands; v1.17 fixes the lockbox protocol before the lockbox is opened; v1.18 records the lockbox AUROC result and changes the alarm part before any alarm result was seen; v1.19 adds the continuous-personalization simulation before running it; v1.20 starts v3 development with adaptive thresholds; v1.21 records that result and adds the false-alarm breakdown; v1.22 adopts the v3 scope and adds the first Phase A experiment (see Section 13) |
 
 This document fixes how models are trained, tuned and scored for Deliverables 1 and 2. It adds detail to the verification plan (tag `vtp-1.0`) and doesn't change any of its pass/fail criteria. It is committed before any model is trained so the Git history shows these choices came first. Anything changed after results are seen goes in the version history (Section 11) with a reason.
 
@@ -405,6 +405,29 @@ The ≤ 1 target and the never-learning model are reported as secondary results.
 
 All results are reported as seizures warned at ≤ 1 and ≤ 5 false alarms per 24 h, against random alarms at the same rate, and labeled as v3 development results.
 
+### 11.12 v3 scope, and Phase A experiment 1: threshold schedules (v1.22)
+
+**Scope.** v3 is a personalized, adaptive algorithm (`docs/v3_scope.md`). Its success criteria (S1 to S3) and data plan are fixed there, before any v3 evaluation on held-out patients:
+
+* *Phase A:* tune on the 25 SeizeIT2 development patients;
+* *Phase B:* evaluate once on the other 100.
+
+**Why this experiment.** The breakdown (F3-02) found that, with adaptive thresholds, the remaining false alarms concentrate in the first 24 h after each retraining (9.6 and 12.3 per 24 h, against 3.4 later). Recalibration can't act sooner because it waits for 4 h of confirmed normal EEG, then needs 2 h of it.
+
+**Method.** This uses the simulation of Section 11.9 (`scripts/run_learning_curve.py --adaptive --arms --tag _arms`), with the same models, seed 0 and the 25 development patients. Four threshold schedules are evaluated on the same models:
+
+* **`adaptive`:** as in v1.20 (every 6 h; interictal windows ending at least 4 h before; at least 2 h of them; the last 24 h). It must reproduce the v1.20 numbers.
+* **`fast`:** recalibrate every 1 h on any non-seizure windows (interictal or excluded) recorded since retraining that ended at least 1 h before (at most the last 24 h, at least 1 h of them), with the same threshold rule. One hour after its end, a window can no longer be preictal for an upcoming seizure. If preictal-like EEG slips in, the threshold only gets stricter.
+* **`strict24`** (≤ 5 setting only): `adaptive`, but for the first 24 h after each retraining it uses the stricter (higher) of that step's ≤ 5 and ≤ 1 thresholds.
+* **`fast_strict24`** (≤ 5 setting only): the same, built on `fast`.
+
+**Decision rule, fixed in advance.** For the learning device at the ≤ 5 setting, over steps after at least one learned seizure, the chosen schedule is the arm with the lowest observed false-alarm rate, among the arms whose:
+
+* warned share beats chance (one-sided binomial, p < 0.05), and
+* warned share is no more than 5 percentage points below `adaptive`'s.
+
+If no other arm qualifies, `adaptive` is kept. The chosen schedule becomes part of the configuration taken to Phase B.
+
 ## 12. Lockbox: SeizeIT2 (added in v1.7)
 
 SeizeIT2 v1.1.0 (OpenNeuro ds005873, CC0 licence) was downloaded on 2026-09-28 into `data/raw/seizeit2_v1.1.0/`: 24,877 files, 117.2 GiB. It has 125 patients with focal epilepsy, behind-the-ear EEG and other wearable signals. It is kept sealed until the final design is frozen, so it can give one unbiased test of that design.
@@ -459,3 +482,4 @@ SeizeIT2 v1.1.0 (OpenNeuro ds005873, CC0 licence) was downloaded on 2026-09-28 i
 | 1.19 | 2026-10-02 | Added the continuous-personalization simulation, forward in time, on the SeizeIT2 development patients (Section 11.9), before running it |
 | 1.20 | 2026-10-03 | v3 development begins (development results only; the lockbox is used). Adaptive alarm thresholds, recalibrated every 6 h on recent confirmed-normal EEG, with a decision rule fixed in advance (Section 11.10) |
 | 1.21 | 2026-10-03 | Adaptive-threshold result and decision (an improvement by the pre-set rule); false-alarm breakdown plan (Section 11.11); erratum on SeizeIT2 sampling rates |
+| 1.22 | 2026-10-04 | Adopts the v3 scope (`docs/v3_scope.md`: intended use, success criteria S1 to S3, Phase A and Phase B data plan); Phase A experiment 1, threshold schedules, with its decision rule (Section 11.12) |

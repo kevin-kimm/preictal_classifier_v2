@@ -17,6 +17,9 @@ Usage, from the repo root with .venv active (after the lockbox alarm run has fin
     python scripts/run_learning_curve.py
     python scripts/run_learning_curve.py --adaptive --tag _adaptive
     python scripts/run_learning_curve.py --adaptive --log-alarms --tag _breakdown
+    python scripts/run_learning_curve.py --adaptive --arms --tag _arms
+                     (v1.22: also evaluates faster recalibration and a stricter first day after each
+                      seizure, as comparison arms with the same models)
                      (v1.21: also writes every alarm, with its timing, to alarm_log<tag>.csv)
 
 Outputs: results/seizeit2_dev/learning_curve.md and .csv, results/figures/learning_curve.png
@@ -41,7 +44,7 @@ sys.path.insert(0, str(REPO / "src"))
 
 from preictal.alarm.alarm import alarm_times  # noqa: E402
 from preictal.config import load_config  # noqa: E402
-from preictal.data.labels import INTERICTAL, PREICTAL, LabelRules  # noqa: E402
+from preictal.data.labels import EXCLUDED, INTERICTAL, PREICTAL, LabelRules  # noqa: E402
 from preictal.data.seizeit2 import FEATURE_CODE, VERSION_TEXT, cohort  # noqa: E402
 from preictal.evaluation.learning_curve import forward_steps  # noqa: E402
 from preictal.evaluation.metrics import (  # noqa: E402
@@ -96,8 +99,13 @@ def main():
     ap.add_argument("--adaptive", action="store_true")
     ap.add_argument("--tag", default="")
     ap.add_argument("--log-alarms", action="store_true")
+    ap.add_argument("--arms", action="store_true", help="v1.22 comparison arms (needs --adaptive)")
     args = ap.parse_args()
     RECAL_S, REF_S, MIN_REF_S = 6 * 3600.0, 24 * 3600.0, 2 * 3600.0
+    FAST_EVERY_S, FAST_LAG_S, FAST_MIN_S, STRICT_S = 3600.0, 3600.0, 3600.0, 24 * 3600.0
+    ARMS = ("adaptive", "fast", "strict24", "fast_strict24")
+    if args.arms and not args.adaptive:
+        sys.exit("--arms needs --adaptive")
     args.out.mkdir(parents=True, exist_ok=True)
     t_start = time.time()
 
@@ -281,6 +289,61 @@ def main():
                         rec[f"fa_{key}_adaptive"] = fa_a.n_false if fa_a else 0
                         rec[f"hours_{key}_adaptive"] = fa_a.far_hours if fa_a else 0.0
                         rec[f"recalibrations_{key}"] = len(thr_k) - 1
+                if args.arms:
+                    # v1.22 arms: the same model, different threshold schedules
+                    def schedule(rel_ref, s_ref, thr0, tg, lag, every, min_ref):
+                        times_k, thr_k = [st.cutoff], [thr0]
+                        r = st.cutoff + every
+                        while r < st.next_onset:
+                            hi = r - lag
+                            m = (t[rel_ref] > max(st.cutoff, hi - REF_S)) & (t[rel_ref] <= hi)
+                            if m.sum() * step_s >= min_ref:
+                                times_k.append(r)
+                                thr_k.append(choose_threshold_bisect(seqs_for(rel_ref[m], s_ref[m], t, y, tl),
+                                                                     tg, step_s, n_cand, **kw)[0])
+                            r += every
+                        return np.array(times_k), np.array(thr_k)
+
+                    def at(times_k, thr_k):
+                        return lambda tt: thr_k[np.clip(np.searchsorted(times_k, tt, side="right") - 1, 0,
+                                                        len(thr_k) - 1)]
+
+                    usable = bool(inner) and len(pre_rel) > 0
+                    if usable:
+                        s_pre = predict_proba(model, P[pre_rel])[:, 0]
+                        s_int = predict_proba(model, P[inter_rel])[:, 0] if len(inter_rel) else np.array([])
+                        # fast recalibration may use any non-seizure EEG at least 1 h old (never preictal by then)
+                        cal = np.flatnonzero((t > st.cutoff) & (t < st.next_onset)
+                                             & np.isin(y, (INTERICTAL, EXCLUDED)))
+                        s_cal = predict_proba(model, P[cal])[:, 0] if len(cal) else np.array([])
+                        fn = {}
+                        for tg in TARGETS:
+                            thr0 = choose_threshold_bisect(inner, tg, step_s, n_cand, **kw)[0]
+                            fn[(tg, "adaptive")] = at(*schedule(inter_rel, s_int, thr0, tg, rules.interictal_gap_s,
+                                                                 RECAL_S, MIN_REF_S)) if len(inter_rel) else \
+                                (lambda tt, v=thr0: np.full(len(tt), v))
+                            fn[(tg, "fast")] = at(*schedule(cal, s_cal, thr0, tg, FAST_LAG_S, FAST_EVERY_S,
+                                                             FAST_MIN_S)) if len(cal) else \
+                                (lambda tt, v=thr0: np.full(len(tt), v))
+                        for base in ("adaptive", "fast"):
+                            lo, hi_ = fn[(5.0, base)], fn[(1.0, base)]
+                            fn[(5.0, f"{base}_strict24" if base == "fast" else "strict24")] = (
+                                lambda tt, lo=lo, hi_=hi_: np.where(np.asarray(tt) < st.cutoff + STRICT_S,
+                                                                     np.maximum(lo(tt), hi_(tt)), lo(tt)))
+                    for tg in TARGETS:
+                        for arm in ARMS:
+                            key = f"{name}_{tg:g}_{arm}"
+                            f = fn.get((tg, arm)) if usable else None
+                            if f is None:
+                                rec[f"warned_{key}"], rec[f"fa_{key}"], rec[f"hours_{key}"] = float("nan"), 0, 0.0
+                                continue
+                            wa = evaluate_all_varying(seqs_for(pre_rel, s_pre, t, y, tl, [st.next_onset]), f,
+                                                      step_s, **kw)
+                            fa_a = (evaluate_all_varying(seqs_for(inter_rel, s_int, t, y, tl), f, step_s, **kw)
+                                    if len(inter_rel) else None)
+                            rec[f"warned_{key}"] = min(wa.n_predicted, 1)
+                            rec[f"fa_{key}"] = fa_a.n_false if fa_a else 0
+                            rec[f"hours_{key}"] = fa_a.far_hours if fa_a else 0.0
             rows_out.append(rec)
 
     # ---------------------------------------------------------------- summary, report and figure
@@ -338,6 +401,29 @@ def main():
                     lines.append(f"| {'learning device' if m == 'personal' else 'never learns'} | "
                                  f"{'adaptive' if mode else 'fixed'} | ≤ {tg:g} | {int(sum(ws))}/{len(ws)} "
                                  f"({np.mean(ws):.2f}) | {far:.2f} | {c:.3f} | {pv:.3g} |")
+    if args.arms:
+        lines += ["", "## v1.22 arms, over all steps after at least one learned seizure", "",
+                  "Same models; only the threshold schedule differs. `strict24` and `fast_strict24` exist for the "
+                  "≤ 5 setting only (they use the stricter of the ≤ 5 and ≤ 1 thresholds in the first 24 h after "
+                  "each retraining).", "",
+                  "| Model | Arm | Target | Seizures warned | False alarms / 24 h | Chance | p |",
+                  "|---|---|---|---|---|---|---|"]
+        after = [r for r in rows_out if r["k"] >= 1]
+        for m in MODELS:
+            for tg in TARGETS:
+                for arm in ARMS:
+                    key = f"{m}_{tg:g}_{arm}"
+                    if key.replace(f"{m}_", "", 1) in ("1_strict24", "1_fast_strict24"):
+                        continue
+                    ws = [r[f"warned_{key}"] for r in after if f"warned_{key}" in r and not np.isnan(r[f"warned_{key}"])]
+                    if not ws:
+                        continue
+                    fa = sum(r.get(f"fa_{key}", 0) for r in after)
+                    hrs = sum(r.get(f"hours_{key}", 0.0) for r in after)
+                    far = 24 * fa / hrs if hrs else float("nan")
+                    c, pv = chance_p_value(int(sum(ws)), len(ws), far, rules.preictal_start_s - rules.sph_s)
+                    lines.append(f"| {'learning device' if m == 'personal' else 'never learns'} | {arm} | ≤ {tg:g} | "
+                                 f"{int(sum(ws))}/{len(ws)} ({np.mean(ws):.2f}) | {far:.2f} | {c:.3f} | {pv:.3g} |")
     (args.out / f"learning_curve{args.tag}.md").write_text("\n".join(lines) + "\n")
     if args.log_alarms:
         with open(args.out / f"alarm_log{args.tag}.csv", "w", newline="") as fh:
