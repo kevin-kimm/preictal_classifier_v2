@@ -45,7 +45,7 @@ Details and evidence are in `docs/verification_results/D1.md` and `D2.md`.
 **Worked:**
 
 1. **Personalization.** It was the one change that helped everywhere: CHB-MIT, Siena, SeizeIT2 development and the lockbox. The warning signs in EEG exist, but they differ from person to person.
-2. **The engineering.** The pipeline harmonizes three hospitals' formats and a wearable's, runs on a laptop, and is covered by 187 automated tests. It reproduced the dry run exactly on the final data.
+2. **The engineering.** The pipeline harmonizes three hospitals' formats and a wearable's, runs on a laptop, and is covered by 188 automated tests. It reproduced the dry run exactly on the final data.
 3. **The rigor.** The pre-registered testing and the sealed final test gave a number that can be trusted, and showed how optimistic the development numbers were (0.700 → 0.621).
 
 **Didn't work:**

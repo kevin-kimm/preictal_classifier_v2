@@ -475,6 +475,8 @@ Each recipe uses the same personal baseline and the same threshold procedures, w
 
 Several comparisons are made here, and Phase B tests the final configuration.
 
+**Implementation note (2026-10-04, before any result).** The first run stopped at the first patient-only model. Some patients lack a channel pair, so some columns have no values in their own data, and the installed scikit-learn version fails on such columns. Patient-only models (including their inner models) therefore train and predict without columns that have fewer than two distinct values in their training windows (`ColumnSubsetModel`, tested). Those columns carry no information for that model. The blended recipes are unchanged.
+
 ## 12. Lockbox: SeizeIT2 (added in v1.7)
 
 SeizeIT2 v1.1.0 (OpenNeuro ds005873, CC0 licence) was downloaded on 2026-09-28 into `data/raw/seizeit2_v1.1.0/`: 24,877 files, 117.2 GiB. It has 125 patients with focal epilepsy, behind-the-ear EEG and other wearable signals. It is kept sealed until the final design is frozen, so it can give one unbiased test of that design.

@@ -56,7 +56,7 @@ from preictal.evaluation.metrics import (  # noqa: E402
 from preictal.evaluation.patient_specific import inner_interictal_folds  # noqa: E402
 from preictal.features.build_features import feature_version  # noqa: E402
 from preictal.features.transforms import context_features  # noqa: E402
-from preictal.models.model import build_model, predict_proba  # noqa: E402
+from preictal.models.model import ColumnSubsetModel, build_model, informative_columns, predict_proba  # noqa: E402
 from preictal.models.train import TRAIN_CLASSES, blend_weights, load_windows, sample_weights  # noqa: E402
 
 try:
@@ -209,7 +209,10 @@ def main():
                 if recipe == "patient_only":
                     if not ((y[rel] == PREICTAL).any() and (y[rel] == INTERICTAL).any()):
                         return None
-                    return fit(P_[rel], y[rel], sample_weights(y[rel], np.zeros(len(rel), dtype=int)), args.seed)
+                    keep = informative_columns(P_[rel])
+                    return ColumnSubsetModel(fit(P_[rel][:, keep], y[rel],
+                                                 sample_weights(y[rel], np.zeros(len(rel), dtype=int)), args.seed),
+                                             keep)
                 wg, wp = blend_weights(yo, so, y[rel], 0.75 if recipe == "personal75" else 0.5)
                 return fit(np.vstack([Xo, P_[rel]]), np.concatenate([yo, y[rel]]), np.concatenate([wg, wp]),
                            args.seed)
