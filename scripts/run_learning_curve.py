@@ -112,7 +112,7 @@ def read_rows(path):
     for r in csv.DictReader(open(path)):
         row = {"subject": r["subject"], "k": int(float(r["k"]))}
         for key, v in r.items():
-            if key not in ("subject", "k"):
+            if key not in ("subject", "k") and v not in ("", None):     # blank = not computed at that step
                 row[key] = num(r, key)
         rows.append(row)
     return rows
@@ -439,8 +439,9 @@ def main():
             hrs = sum(num(r, f"hours_{m}_5", 0.0) for r in rs)
             alarm_cells += [f"{np.mean(ws):.2f} (n={len(ws)})" if ws else "–",
                             f"{24 * fa / hrs:.2f}" if hrs else "–"]
-        lines.append(f"| {b} | {len(rs)} | {cells[0]} | {cells[1]} | {alarm_cells[0]} | {alarm_cells[1]} "
-                     f"| {alarm_cells[2]} | {alarm_cells[3]} |")
+        ip, ig = MODELS.index("personal"), MODELS.index("general")      # this table: blend vs never learns
+        lines.append(f"| {b} | {len(rs)} | {cells[ip]} | {cells[ig]} | {alarm_cells[2 * ip]} | {alarm_cells[2 * ip + 1]} "
+                     f"| {alarm_cells[2 * ig]} | {alarm_cells[2 * ig + 1]} |")
     if args.adaptive:
         lines += ["", "## Fixed and adaptive thresholds, over all steps after at least one learned seizure", "",
                   "| Model | Threshold | Target | Seizures warned | False alarms / 24 h | Chance | p |",
