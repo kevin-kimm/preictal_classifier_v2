@@ -6,7 +6,7 @@ v3 is a personalized, adaptive algorithm (`docs/v3_scope.md`). It was developed 
 |---|---|---|---|
 | Adaptive alarm thresholds | v1.20, Section 11.10 | Improvement by the pre-set rule | `results/seizeit2_dev/learning_curve_adaptive.md` |
 | Threshold schedules (Phase A, experiment 1) | v1.22 and v1.23, Section 11.12 | By the rule: `adaptive` kept; recorded deviation: `fast` to Phase B | `results/seizeit2_dev/learning_curve_arms.md` |
-| Learning recipes (Phase A, experiment 2) | v1.23, Section 11.13 | Planned | `results/seizeit2_dev/learning_curve_recipes.md` |
+| Learning recipes (Phase A, experiment 2) | v1.23 and v1.24, Section 11.13 | 50% blend kept; patient-only becomes a Phase B secondary question | `results/seizeit2_dev/learning_curve_recipes.md` |
 | False-alarm breakdown | v1.21, Section 11.11 | Reported | `results/seizeit2_dev/false_alarm_breakdown.md`, `alarm_log_breakdown.csv` |
 
 ## Findings
@@ -24,4 +24,13 @@ The personal model seems to have partly learned movement-related patterns. Gatin
 **F3-03. Hourly threshold recalibration halves false alarms and brings them under target, at a cost in warnings.** Recalibrating every hour on EEG at least 1 h old (`fast`), instead of every 6 h on EEG at least 4 h old, lowered the learning device's false alarms from 10.24 to 4.77 per 24 h at the ≤ 5 setting. That is the first schedule to meet the target in the forward-in-time simulation. It warned 28% of seizures instead of 35%, about 3 times chance against 1.8 times (p = 1.2×10⁻⁷). At the ≤ 1 setting it warned 18% at 2.47 per 24 h, 3.6 times chance. Adding a stricter first day after each seizure lowered false alarms further (2.91 per 24 h) but cost more warnings (19%).
 
 By the pre-set rule (at most 5 percentage points fewer warnings), no arm qualified, so `adaptive` was retained. As a recorded deviation, `fast` was chosen for Phase B because it alone met the scope's false-alarm criterion (S2); see evaluation methods v1.23.
+
+**F3-04. Per-patient models rank risk best but produce weaker alarms; the 50% blend stays.** At every step of the forward-in-time simulation, three recipes were trained on the same data.
+
+* **AUROC.** Patient-only models had the highest AUROC: 0.676 against the blend's 0.624 on the same 28 steps, and 0.664 against 0.580 after 5 or more learned seizures. Neither difference was significant (p = 0.13 and 0.19). 75% personal weight scored about the same as 50% (0.631 against 0.606, p = 0.27).
+* **Alarms** (`fast` schedule, ≤ 5). Patient-only models warned fewer seizures (16% against 28%) at fewer false alarms (3.4 against 4.8 per 24 h), and were less clearly better than chance (2.4 times against 3.0, p = 0.002 against 10⁻⁷).
+
+A plausible reading: a model trained on one person's few hours ranks windows within a period well, but its scores are less stable from one period to the next, so thresholds carry over less well. The base data steadies them.
+
+By the pre-set rule the 50% blend is kept. Because the AUROC trend favors per-patient models with more seizures, but 28 steps can't settle it, the comparison is pre-registered as a Phase B secondary question, where 100 patients give about four times the data.
 
