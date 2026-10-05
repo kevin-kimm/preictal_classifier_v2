@@ -2,7 +2,7 @@
 
 | Doc | Version | Author | Written |
 |---|---|---|---|
-| EVM-001 | 1.22 | Kevin Kim | v1.0 before any model was trained; v1.1 and v1.2 after D1, before any D2 result; v1.3 after a one-seed D2 preview; v1.4 after the full D2 run; v1.5 after the personalized variants; v1.6 while the v1.5 test was running, before any v1.6 result; v1.7 before the lockbox audit; v1.8 and v1.9 after it; v1.10 before the final development round; v1.11 before splitting SeizeIT2; v1.12 during the final development round; v1.13 freezes the design; v1.14 is an erratum; v1.15 adds the sensitivity analysis and SeizeIT2 adapter details; v1.16 the dry-run and lockbox commands; v1.17 fixes the lockbox protocol before the lockbox is opened; v1.18 records the lockbox AUROC result and changes the alarm part before any alarm result was seen; v1.19 adds the continuous-personalization simulation before running it; v1.20 starts v3 development with adaptive thresholds; v1.21 records that result and adds the false-alarm breakdown; v1.22 adopts the v3 scope and adds the first Phase A experiment (see Section 13) |
+| EVM-001 | 1.23 | Kevin Kim | v1.0 before any model was trained; v1.1 and v1.2 after D1, before any D2 result; v1.3 after a one-seed D2 preview; v1.4 after the full D2 run; v1.5 after the personalized variants; v1.6 while the v1.5 test was running, before any v1.6 result; v1.7 before the lockbox audit; v1.8 and v1.9 after it; v1.10 before the final development round; v1.11 before splitting SeizeIT2; v1.12 during the final development round; v1.13 freezes the design; v1.14 is an erratum; v1.15 adds the sensitivity analysis and SeizeIT2 adapter details; v1.16 the dry-run and lockbox commands; v1.17 fixes the lockbox protocol before the lockbox is opened; v1.18 records the lockbox AUROC result and changes the alarm part before any alarm result was seen; v1.19 adds the continuous-personalization simulation before running it; v1.20 starts v3 development with adaptive thresholds; v1.21 records that result and adds the false-alarm breakdown; v1.22 adopts the v3 scope and adds the first Phase A experiment; v1.23 records its result, a recorded deviation, and Phase A experiment 2 (see Section 13) |
 
 This document fixes how models are trained, tuned and scored for Deliverables 1 and 2. It adds detail to the verification plan (tag `vtp-1.0`) and doesn't change any of its pass/fail criteria. It is committed before any model is trained so the Git history shows these choices came first. Anything changed after results are seen goes in the version history (Section 11) with a reason.
 
@@ -428,6 +428,53 @@ All results are reported as seizures warned at ≤ 1 and ≤ 5 false alarms per 
 
 If no other arm qualifies, `adaptive` is kept. The chosen schedule becomes part of the configuration taken to Phase B.
 
+**Result of experiment 1 (2026-10-04).** The `adaptive` arm reproduced the v1.20 numbers exactly. For the learning device, over the 95 seizures after at least one learned seizure:
+
+| Arm | Target | Warned | False alarms per 24 h | Chance | p |
+|---|---|---|---|---|---|
+| `adaptive` | ≤ 5 | 33/95 (35%) | 10.24 | 0.192 | 0.00026 |
+| `fast` | ≤ 5 | 27/95 (28%) | 4.77 | 0.094 | 1.2×10⁻⁷ |
+| `strict24` | ≤ 5 | 23/95 (24%) | 6.62 | 0.129 | 0.0018 |
+| `fast_strict24` | ≤ 5 | 18/95 (19%) | 2.91 | 0.059 | 9.7×10⁻⁶ |
+| `adaptive` | ≤ 1 | 23/95 (24%) | 6.00 | 0.117 | 0.00052 |
+| `fast` | ≤ 1 | 17/95 (18%) | 2.47 | 0.050 | 4.7×10⁻⁶ |
+
+The never-learning model stayed at chance under every schedule.
+
+**Decision by the rule.** No arm qualified: every alternative lost more than 5 percentage points of warned seizures (`fast` lost 6.3). So by the rule as written, `adaptive` is retained, and that is the rule's recorded outcome.
+
+**Recorded deviation (decided by Kevin Kim on 2026-10-04, after seeing these results).** The configuration taken to Phase B uses `fast`, not `adaptive`. The reasons:
+
+1. **It meets the scope's own criterion.** The v3 scope's success criteria, fixed before this experiment, put false alarms at most 5 per 24 h first (S2). `fast` is the only arm that met S2 (4.77), and it kept the most warnings among those below 5.
+2. **The margin was arbitrary.** The 5-point margin was an arbitrary choice that conflicts with S2.
+3. **Phase B stays fair.** Phase B's 100 patients played no part in this choice, so it remains a fair held-out test of the chosen configuration.
+
+Both outcomes are reported, and the deviation is listed among the threats to validity.
+
+### 11.13 Phase A experiment 2: learning recipes (v1.23)
+
+**Question.** Does a learning device do better with more, or only, of the wearer's own data than with the current 50% blend, and from which learning stage? D2 found the 50% blend ahead of patient-only models across patients (0.700 against 0.662), while 75% personal weight improved the most patients (15 of 22).
+
+**Method.** This uses the simulation of Section 11.9 (`scripts/run_learning_curve.py --adaptive --arms --recipes --tag _recipes`), with seed 0 and the 25 development patients. At every step it trains three learning recipes on the same training windows:
+
+* **`personal`:** the current blend, base data plus this patient at 50% of each class's weight. It must reproduce earlier runs.
+* **`personal75`:** the same blend at 75%.
+* **`patient_only`:** this patient's windows only, with balanced class weights. It can't be trained without both preictal and interictal training windows, and such steps are left out of its comparisons.
+
+Each recipe uses the same personal baseline and the same threshold procedures, with inner models trained by the same recipe. Alarms are reported under `fast` (the primary schedule from now on) and `adaptive`.
+
+**Decision rule, fixed in advance.** The comparisons are paired against `personal`, over steps after at least one learned seizure where both are scored.
+
+1. **Full replacement.** A recipe replaces `personal` if:
+   * its AUROC is higher (Wilcoxon signed-rank, p < 0.05), and
+   * under `fast` at the ≤ 5 setting, its observed false alarms are at most 5 per 24 h and its warnings beat chance (p < 0.05).
+
+   If both recipes qualify, the one with the larger mean AUROC difference is chosen.
+2. **Switch point.** If neither qualifies overall, but a recipe meets the same conditions within the "3–4" or "5 or more" learned-seizure stages (judged on steps at or beyond that stage), the device switches to it from the earliest such stage, using `personal` before then.
+3. **Otherwise,** `personal` is kept.
+
+Several comparisons are made here, and Phase B tests the final configuration.
+
 ## 12. Lockbox: SeizeIT2 (added in v1.7)
 
 SeizeIT2 v1.1.0 (OpenNeuro ds005873, CC0 licence) was downloaded on 2026-09-28 into `data/raw/seizeit2_v1.1.0/`: 24,877 files, 117.2 GiB. It has 125 patients with focal epilepsy, behind-the-ear EEG and other wearable signals. It is kept sealed until the final design is frozen, so it can give one unbiased test of that design.
@@ -483,3 +530,4 @@ SeizeIT2 v1.1.0 (OpenNeuro ds005873, CC0 licence) was downloaded on 2026-09-28 i
 | 1.20 | 2026-10-03 | v3 development begins (development results only; the lockbox is used). Adaptive alarm thresholds, recalibrated every 6 h on recent confirmed-normal EEG, with a decision rule fixed in advance (Section 11.10) |
 | 1.21 | 2026-10-03 | Adaptive-threshold result and decision (an improvement by the pre-set rule); false-alarm breakdown plan (Section 11.11); erratum on SeizeIT2 sampling rates |
 | 1.22 | 2026-10-04 | Adopts the v3 scope (`docs/v3_scope.md`: intended use, success criteria S1 to S3, Phase A and Phase B data plan); Phase A experiment 1, threshold schedules, with its decision rule (Section 11.12) |
+| 1.23 | 2026-10-04 | Experiment 1 result: by the rule, `adaptive` is retained; recorded deviation: `fast` is taken to Phase B (S2). Phase A experiment 2, learning recipes (50%, 75%, patient-only), with its decision rule (Section 11.13) |

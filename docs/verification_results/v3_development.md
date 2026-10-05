@@ -5,7 +5,8 @@ v3 is a personalized, adaptive algorithm (`docs/v3_scope.md`). It was developed 
 | Experiment | Evaluation methods | Status | Evidence |
 |---|---|---|---|
 | Adaptive alarm thresholds | v1.20, Section 11.10 | Improvement by the pre-set rule | `results/seizeit2_dev/learning_curve_adaptive.md` |
-| Threshold schedules (Phase A, experiment 1) | v1.22, Section 11.12 | Planned | `results/seizeit2_dev/learning_curve_arms.md` |
+| Threshold schedules (Phase A, experiment 1) | v1.22 and v1.23, Section 11.12 | By the rule: `adaptive` kept; recorded deviation: `fast` to Phase B | `results/seizeit2_dev/learning_curve_arms.md` |
+| Learning recipes (Phase A, experiment 2) | v1.23, Section 11.13 | Planned | `results/seizeit2_dev/learning_curve_recipes.md` |
 | False-alarm breakdown | v1.21, Section 11.11 | Reported | `results/seizeit2_dev/false_alarm_breakdown.md`, `alarm_log_breakdown.csv` |
 
 ## Findings
@@ -19,4 +20,8 @@ v3 is a personalized, adaptive algorithm (`docs/v3_scope.md`). It was developed 
 * **Movement.** 15–25% of the learning device's false alarms fell in the patient's most active 10% of time, judged by the wearable's accelerometer (fixed ≤ 5: 20%, p = 0.0001; adaptive ≤ 1: 21%, p = 0.007). EMG was slightly raised (14–18%), and the EEG-based muscle index was not (11–15%). The never-learning model's false alarms showed no such link.
 
 The personal model seems to have partly learned movement-related patterns. Gating movement could therefore also cost true warnings. Removing every high-movement false alarm would cut them by only about a fifth, so the first-day problem comes first.
+
+**F3-03. Hourly threshold recalibration halves false alarms and brings them under target, at a cost in warnings.** Recalibrating every hour on EEG at least 1 h old (`fast`), instead of every 6 h on EEG at least 4 h old, lowered the learning device's false alarms from 10.24 to 4.77 per 24 h at the ≤ 5 setting. That is the first schedule to meet the target in the forward-in-time simulation. It warned 28% of seizures instead of 35%, about 3 times chance against 1.8 times (p = 1.2×10⁻⁷). At the ≤ 1 setting it warned 18% at 2.47 per 24 h, 3.6 times chance. Adding a stricter first day after each seizure lowered false alarms further (2.91 per 24 h) but cost more warnings (19%).
+
+By the pre-set rule (at most 5 percentage points fewer warnings), no arm qualified, so `adaptive` was retained. As a recorded deviation, `fast` was chosen for Phase B because it alone met the scope's false-alarm criterion (S2); see evaluation methods v1.23.
 

@@ -18,6 +18,9 @@ Usage, from the repo root with .venv active (after the lockbox alarm run has fin
     python scripts/run_learning_curve.py --adaptive --tag _adaptive
     python scripts/run_learning_curve.py --adaptive --log-alarms --tag _breakdown
     python scripts/run_learning_curve.py --adaptive --arms --tag _arms
+    python scripts/run_learning_curve.py --adaptive --arms --recipes --tag _recipes
+                     (v1.23: also trains, at every step, a blend with 75% personal weight and a
+                      patient-only model, alongside the current 50% blend)
                      (v1.22: also evaluates faster recalibration and a stricter first day after each
                       seizure, as comparison arms with the same models)
                      (v1.21: also writes every alarm, with its timing, to alarm_log<tag>.csv)
@@ -65,7 +68,12 @@ OTHERS_EVERY, CONTEXT_S = 6, 600
 TARGETS = (5.0, 1.0)
 SMOOTHING, PERSISTENCE, WARMUP_S = 36, 6, 300.0
 MODELS = ("personal", "general")
+RECIPES = ("personal", "personal75", "patient_only", "general")
+DISPLAY = {"personal": "learning device", "personal75": "learning device, 75% personal",
+           "patient_only": "learning device, patient only", "general": "never learns"}
 LABELS = {"personal": "Device that learns each seizure (frozen recipe, retrained after every seizure)",
+          "personal75": "Learning device, 75% personal weight",
+          "patient_only": "Learning device, this patient's data only",
           "general": "General model with the personal baseline only (never learns seizures)"}
 
 
@@ -100,8 +108,12 @@ def main():
     ap.add_argument("--tag", default="")
     ap.add_argument("--log-alarms", action="store_true")
     ap.add_argument("--arms", action="store_true", help="v1.22 comparison arms (needs --adaptive)")
+    ap.add_argument("--recipes", action="store_true", help="v1.23: personal75 and patient_only recipes too")
     args = ap.parse_args()
     RECAL_S, REF_S, MIN_REF_S = 6 * 3600.0, 24 * 3600.0, 2 * 3600.0
+    global MODELS
+    if args.recipes:
+        MODELS = RECIPES
     FAST_EVERY_S, FAST_LAG_S, FAST_MIN_S, STRICT_S = 3600.0, 3600.0, 3600.0, 24 * 3600.0
     ARMS = ("adaptive", "fast", "strict24", "fast_strict24")
     if args.arms and not args.adaptive:
@@ -191,14 +203,25 @@ def main():
             if len(base) == 0:
                 continue
             P = scale(M, M[base])
+            def train_recipe(recipe, rel, P_):
+                """One learning-device recipe trained on rel (v1.23); None if it can't be trained."""
+                rel = rel[np.isin(y[rel], TRAIN_CLASSES)]
+                if recipe == "patient_only":
+                    if not ((y[rel] == PREICTAL).any() and (y[rel] == INTERICTAL).any()):
+                        return None
+                    return fit(P_[rel], y[rel], sample_weights(y[rel], np.zeros(len(rel), dtype=int)), args.seed)
+                wg, wp = blend_weights(yo, so, y[rel], 0.75 if recipe == "personal75" else 0.5)
+                return fit(np.vstack([Xo, P_[rel]]), np.concatenate([yo, y[rel]]), np.concatenate([wg, wp]),
+                           args.seed)
+
             models = {"general": general}
-            if st.k == 0:
-                models["personal"] = general                     # nothing learned yet: the device is the general model
-            else:
-                tr = st.train[np.isin(y[st.train], TRAIN_CLASSES)]
-                wg, wp = blend_weights(yo, so, y[tr], 0.5)
-                models["personal"] = fit(np.vstack([Xo, P[tr]]), np.concatenate([yo, y[tr]]),
-                                         np.concatenate([wg, wp]), args.seed)
+            for recipe in [m for m in MODELS if m != "general"]:
+                if st.k == 0:
+                    models[recipe] = general                     # nothing learned yet: the device is the general model
+                else:
+                    m_r = train_recipe(recipe, st.train, P)
+                    if m_r is not None:
+                        models[recipe] = m_r
             test = st.test
             pre_mask = y[test] == PREICTAL
             rec = {"subject": subject, "k": st.k, "test_preictal": int(pre_mask.sum()),
@@ -220,10 +243,9 @@ def main():
                         if len(ib) == 0:
                             continue
                         P_in = scale(M, M[ib])
-                        itr = inner_train[np.isin(y[inner_train], TRAIN_CLASSES)]
-                        wg, wp = blend_weights(yo, so, y[itr], 0.5)
-                        m_in = fit(np.vstack([Xo, P_in[itr]]), np.concatenate([yo, y[itr]]),
-                                   np.concatenate([wg, wp]), args.seed)
+                        m_in = train_recipe(name, inner_train, P_in)
+                        if m_in is None:
+                            continue
                         inner += seqs_for(inner_chunk, predict_proba(m_in, P_in[inner_chunk])[:, 0], t, y, tl)
                 pre_rel = np.flatnonzero((t > st.cutoff) & (t >= st.next_onset - rules.preictal_start_s - WARMUP_S)
                                          & (t <= st.next_onset - rules.sph_s))
@@ -398,7 +420,7 @@ def main():
                     hrs = sum(r[f"hours_{key}"] for r in after)
                     far = 24 * fa / hrs if hrs else float("nan")
                     c, pv = chance_p_value(int(sum(ws)), len(ws), far, rules.preictal_start_s - rules.sph_s)
-                    lines.append(f"| {'learning device' if m == 'personal' else 'never learns'} | "
+                    lines.append(f"| {DISPLAY[m]} | "
                                  f"{'adaptive' if mode else 'fixed'} | ≤ {tg:g} | {int(sum(ws))}/{len(ws)} "
                                  f"({np.mean(ws):.2f}) | {far:.2f} | {c:.3f} | {pv:.3g} |")
     if args.arms:
@@ -422,8 +444,26 @@ def main():
                     hrs = sum(r.get(f"hours_{key}", 0.0) for r in after)
                     far = 24 * fa / hrs if hrs else float("nan")
                     c, pv = chance_p_value(int(sum(ws)), len(ws), far, rules.preictal_start_s - rules.sph_s)
-                    lines.append(f"| {'learning device' if m == 'personal' else 'never learns'} | {arm} | ≤ {tg:g} | "
+                    lines.append(f"| {DISPLAY[m]} | {arm} | ≤ {tg:g} | "
                                  f"{int(sum(ws))}/{len(ws)} ({np.mean(ws):.2f}) | {far:.2f} | {c:.3f} | {pv:.3g} |")
+    if args.recipes:
+        from scipy.stats import wilcoxon
+        lines += ["", "## v1.23 recipes: paired AUROC against the current blend, by learning stage", "",
+                  "Steps where both models were scored. Positive differences favor the recipe.", "",
+                  "| Recipe | Seizures learned | Steps | Recipe AUROC | Blend AUROC | Recipe higher | Wilcoxon p |",
+                  "|---|---|---|---|---|---|---|"]
+        for recipe in ("personal75", "patient_only"):
+            for lab, lo, hi in (("1 or more", 1, 99), ("1–2", 1, 2), ("3–4", 3, 4), ("5 or more", 5, 99)):
+                pr = [(r[f"auroc_{recipe}"], r["auroc_personal"]) for r in rows_out
+                      if lo <= r["k"] <= hi and not np.isnan(r.get(f"auroc_{recipe}", np.nan))
+                      and not np.isnan(r["auroc_personal"])]
+                if not pr:
+                    lines.append(f"| {recipe} | {lab} | 0 | – | – | – | – |")
+                    continue
+                a, b = map(np.array, zip(*pr))
+                pv = wilcoxon(a, b).pvalue if len(pr) >= 2 and np.any(a != b) else float("nan")
+                lines.append(f"| {recipe} | {lab} | {len(pr)} | {a.mean():.3f} | {b.mean():.3f} | "
+                             f"{(a > b).sum()} of {len(pr)} | {pv:.3g} |")
     (args.out / f"learning_curve{args.tag}.md").write_text("\n".join(lines) + "\n")
     if args.log_alarms:
         with open(args.out / f"alarm_log{args.tag}.csv", "w", newline="") as fh:
@@ -436,7 +476,7 @@ def main():
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     fig, ax = plt.subplots(figsize=(8.5, 4.6))
-    colors = {"personal": "#2b6cb0", "general": "#a0aec0"}
+    colors = {"personal": "#2b6cb0", "general": "#a0aec0", "personal75": "#805ad5", "patient_only": "#38a169"}
     for m in MODELS:
         pts = [(i, mean, ci) for i, (b, mean, ci, n) in enumerate(curve[m]) if not np.isnan(mean)]
         if not pts:
