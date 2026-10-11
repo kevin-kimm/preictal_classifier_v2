@@ -26,7 +26,7 @@ For live tests, the Cyton's 8 electrodes go at F7, T7, P7, O1, F8, T8, P8 and O2
 
 **D-5. Interictal data in TUSZ.** Many TUSZ sessions are short, and the time between sessions isn't known precisely. For TUSZ patients with at least one seizure, sessions with no seizure count as interictal. Sessions that contain a seizure give no interictal windows unless file start times show a window is at least 4 h from every seizure in that session. TUSZ patients with no annotated seizures aren't used for training, since some may not have epilepsy. Their recordings are used as a separate false alarm test set.
 
-**D-6. LOPO vs. grouped cross-validation.** Five seeds times one fold per patient could take days on a laptop if TUSZ adds a lot of patients. If the label report (VT-07) finds more than 40 eligible test patients, I'll use patient grouped 10-fold cross validation instead of LOPO, with fold assignment using seed 0. Every patient is still only tested by a model that never saw their data. Results say which scheme was used.
+**D-6. LOPO vs. grouped cross validation.** Five seeds times one fold per patient could take days on a laptop if TUSZ adds a lot of patients. If the label report (VT-07) finds more than 40 eligible test patients, I'll use patient grouped 10-fold cross validation instead of LOPO, with fold assignment using seed 0. Every patient is still only tested by a model that never saw their data. Results say which scheme was used.
 
 ## 3. Definitions
 
@@ -55,11 +55,11 @@ Times are in seconds from the start of each continuous recording. Seizure onsets
 
 **Hardware and software.** M4 MacBook, macOS, Python 3.13 in a virtual environment. Package versions are pinned in `requirements-lock.txt`. Each results report records `pip freeze` and the commit of the code being tested.
 
-**Data.** Siena Scalp EEG 1.0.0, CHB-MIT Scalp EEG 1.0.0, TUSZ 2.0.6, TUAR 3.0.1 and EEG During Mental Arithmetic Tasks 1.0.0, all under `data/raw/`. VT-01 records their checksums. If the checksums change later, any test run after the change is invalid. TUSZ patients without seizures and the mental arithmetic recordings are only used for false-alarm testing (D-5).
+**Data.** Siena Scalp EEG 1.0.0, CHB-MIT Scalp EEG 1.0.0, TUSZ 2.0.6, TUAR 3.0.1 and EEG During Mental Arithmetic Tasks 1.0.0, all under `data/raw/`. VT-01 records their checksums. If the checksums change later, any test run after the change is invalid. TUSZ patients without seizures and the mental arithmetic recordings are only used for false alarm testing (D-5).
 
 **Seeds.** 0, 1, 2, 3 and 4, fixed here. Every model result is reported for all five seeds as mean ± SD. No seeds get dropped or swapped after seeing results.
 
-**Thresholds.** In each cross patient fold, 20% of the training patients are held out as an inner validation set, chosen with that fold's seed. The operating threshold is the lowest one that keeps inner-validation FAR at or below the target: 10 per 24 h for D1, 5 per 24 h for D2. The test patient is never used for thresholds, normalization, or any other tuning.
+**Thresholds.** In each cross patient fold, 20% of the training patients are held out as an inner validation set, chosen with that fold's seed. The operating threshold is the lowest one that keeps inner validation FAR at or below the target: 10 per 24 h for D1, 5 per 24 h for D2. The test patient is never used for thresholds, normalization, or any other tuning.
 
 **Confidence intervals.** 95%, bootstrapped over patients (1000 resamples, seed 0).
 
@@ -73,9 +73,9 @@ Times are in seconds from the start of each continuous recording. Seizure onsets
 | REQ-H1 | The loader reads Siena, CHB-MIT and TUSZ and outputs one format: modern 10-20 names, 256 Hz, µV, the D-4 bipolar montage, and seizure annotations in seconds from recording start. |
 | REQ-H2 | Old channel names are mapped to new ones (T3→T7, T4→T8, T5→P7, T6→P8), including dataset-specific label formats like `EEG T3-REF`. |
 | REQ-H3 | Harmonization doesn't change seizure annotation times. |
-| REQ-H4 | Non-EEG and unrecognized channels are dropped and logged, not guessed. |
+| REQ-H4 | Non EEG and unrecognized channels are dropped and logged, not guessed. |
 | REQ-L1 | Windows are labeled using the Section 3 rules. |
-| REQ-L2 | There is a per-patient label report: eligible and ineligible seizures, and hours of each label. |
+| REQ-L2 | There is a per patient label report: eligible and ineligible seizures, and hours of each label. |
 | REQ-M1 | The classifier takes whatever channels are available and outputs preictal / ictal / interictal probabilities per window, plus a continuous preictal risk score. |
 | REQ-E1 | Evaluation is cross-patient (LOPO, or grouped folds under D-6), with no test-patient data in training, validation or normalization. |
 | REQ-E2 | Model results use the fixed seeds and are reproducible. |
@@ -86,7 +86,7 @@ Times are in seconds from the start of each continuous recording. Seizure onsets
 | REQ-U1 | The UI replays a dataset recording showing EEG, risk score, threshold, alarms with times, and annotated onsets. |
 | REQ-R1 | Live Cyton data goes through the same harmonization, model and alarm code as offline data. |
 | REQ-R2 | Live processing keeps up with real time. |
-| REQ-R3 | A per-subject interictal baseline is computed from the first 10 min of each live session, before any alarms are evaluated. |
+| REQ-R3 | A per subject interictal baseline is computed from the first 10 min of each live session, before any alarms are evaluated. |
 | REQ-R4 | Each live session produces a report with duration, number of alarms, and alarm times. |
 | REQ-X1 | The README covers the data used, the code, the tests, and current metrics. |
 
@@ -108,14 +108,14 @@ Times are in seconds from the start of each continuous recording. Seizure onsets
 
 Run `scripts/audit_data.py` on `data/raw/` twice. It records the size and SHA-256 of every file, opens every EDF header, and counts patients, recordings, hours and seizures per dataset.
 
-**Pass:** the manifest covers all five datasets; every EDF header opens, or the failure is logged with a reason; the second run gives identical checksums and counts.
+**Pass:** the manifest covers all five datasets, every EDF header opens, or the failure is logged with a reason, the second run gives identical checksums and counts.
 
 **Evidence:** `results/d1/data_manifest.csv`, `results/d1/data_audit.md`
 
 #### VT-02 Channel name mapping
 *REQ-H2, REQ-H4 · verification*
 
-Unit tests with made-up channel lists: old and new names, TUH-style labels (`EEG T3-REF`, `EEG T3-LE`), CHB-MIT bipolar labels, and non-EEG channels (ECG, EMG, photic). Then run the mapping on every recording in the corpus.
+Unit tests with made up channel lists: old and new names, TUH style labels (`EEG T3-REF`, `EEG T3-LE`), CHB-MIT bipolar labels, and non EEG channels (ECG, EMG, photic). Then run the mapping on every recording in the corpus.
 
 **Pass:** all unit tests pass. On the corpus, every channel is either mapped or in the exclusion log, with zero unmapped EEG channels.
 
@@ -126,14 +126,14 @@ Unit tests with made-up channel lists: old and new names, TUH-style labels (`EEG
 
 Resample synthetic 10 Hz sine waves of known amplitude from 250, 400, 500 and 512 Hz to 256 Hz. On the real corpus, check the median absolute amplitude of each harmonized channel.
 
-**Pass:** frequency within ±0.1 Hz, amplitude within ±1%, output length = duration × 256 ± 1 sample. On the corpus, at least 95% of channels have a median absolute amplitude between 1 and 200 µV; any outside that range are listed.
+**Pass:** frequency within ±0.1 Hz, amplitude within ±1%, output length = duration × 256 ± 1 sample. On the corpus, at least 95% of channels have a median absolute amplitude between 1 and 200 µV, any outside that range are listed.
 
 **Evidence:** `tests/test_harmonize.py`, `results/d1/amplitude_check.csv`
 
 #### VT-04 Montage conversion
 *REQ-H1 · verification*
 
-Convert synthetic referential signals with known values to the D-4 montage. Repeat after re-referencing the same signals to the average and to linked ears.
+Convert synthetic referential signals with known values to the D-4 montage. Repeat after re referencing the same signals to the average and to linked ears.
 
 **Pass:** each derivation equals the difference of its two electrodes to within 1e-6 µV, and the output is the same (within 1e-6 µV) regardless of reference. Derivations with a missing electrode are marked absent, not filled in.
 
@@ -160,7 +160,7 @@ the SPH gap;
 the 4 h interictal rule;
 a seizure-free session;
 a TUSZ seizure session without file start times (no interictal windows);
-a TUSZ patient with no seizures (false-alarm set only).
+a TUSZ patient with no seizures (false alarm set only).
 
 **Pass:** every case gives the expected labels.
 
@@ -205,7 +205,7 @@ Each fold logs its inner validation patients, the chosen threshold, and when the
 #### VT-11 Cross-patient classification
 *REQ-M1, REQ-E1, REQ-E4 · verification*
 
-Cross-patient evaluation (LOPO, or grouped folds under D-6) over every eligible test patient in Siena, CHB-MIT and TUSZ, all five seeds. Report per-patient AUROC (preictal vs interictal), the 3-class confusion matrix, macro F1, and mean ± SD across seeds.
+Cross patient evaluation (LOPO, or grouped folds under D-6) over every eligible test patient in Siena, CHB-MIT and TUSZ, all five seeds. Report per patient AUROC (preictal vs interictal), the 3 class confusion matrix, macro F1, and mean ± SD across seeds.
 
 **Pass:** the pipeline finishes for every eligible test patient, and mean AUROC is above 0.50 with the 95% CI above 0.50. Nice to have: mean AUROC ≥ 0.65.
 
@@ -232,7 +232,7 @@ Run the first version of the alarm logic on the VT-11 risk scores, with threshol
 #### VT-14 v1 vs v2 comparison
 *Course plan item · characterization*
 
-A table comparing v1 and v2: datasets, evaluation split (within-patient or cross-patient), window definitions, metrics, and results. v1 numbers come from v1's own reported results; no v1 code or models are run.
+A table comparing v1 and v2: datasets, evaluation split (within patient or cross patient), window definitions, metrics, and results. v1 numbers come from v1's own reported results; no v1 code or models are run.
 
 **Pass:** the table is complete, and every protocol difference is stated so the two aren't compared as if they were tested the same way.
 
@@ -243,7 +243,7 @@ A table comparing v1 and v2: datasets, evaluation split (within-patient or cross
 #### VT-15 Improvement over D1
 *REQ-E1, REQ-E2 · verification*
 
-Evaluate the D2 model on the same folds and seeds as the frozen D1 model. Also report a paired Wilcoxon signed-rank test on per-patient AUROC.
+Evaluate the D2 model on the same folds and seeds as the frozen D1 model. Also report a paired Wilcoxon signed rank test on per patient AUROC.
 
 **Pass:** mean AUROC improves by at least 15% relative to D1 (D-2). Nice to have: ≥ 0.75.
 
@@ -252,26 +252,26 @@ Evaluate the D2 model on the same folds and seeds as the frozen D1 model. Also r
 #### VT-16 Alarm logic unit tests
 *REQ-A1, REQ-A2 · verification*
 
-Synthetic risk-score traces:
-(a) above threshold for 2 h straight;
-(b) a spike shorter than the persistence setting;
-(c) a score bouncing around the threshold;
-(d) the same trace with scores after time t changed.
+Synthetic risk score traces:
+(a) above threshold for 2 h straight
+(b) a spike shorter than the persistence setting
+(c) a score bouncing around the threshold
+(d) the same trace with scores after time t changed
 
-**Pass:** (a) alarms at least 30 min apart; (b) no alarm; (c) no repeat alarms inside the refractory period; (d) alarms before t don't change.
+**Pass:** (a) alarms at least 30 min apart (b) no alarm (c) no repeat alarms inside the refractory period (d) alarms before t don't change
 
 **Evidence:** `tests/test_alarm.py`
 
-#### VT-17 Event-level performance
+#### VT-17 Event level performance
 *REQ-A1, REQ-E4 · verification*
 
-Final alarm logic on the cross-patient risk scores, with thresholds from the Section 4 rule at a 5 per 24 h FAR target. FAR is also reported separately on the false-alarm sets.
+Final alarm logic on the cross patient risk scores, with thresholds from the Section 4 rule at a 5 per 24 h FAR target. FAR is also reported separately on the false alarm sets.
 
 **Pass:** sensitivity ≥ 80%, FAR ≤ 5 per 24 h, and chance comparison p < 0.05. Time in warning and warning times are reported.
 
 **Evidence:** `results/d2/alarm_metrics.csv`
 
-#### VT-18 Cross-dataset (nice to have)
+#### VT-18 Cross dataset (nice to have)
 *REQ-M1 · characterization*
 
 Train on Siena only, then test on CHB-MIT and TUSZ.
@@ -285,7 +285,7 @@ Train on Siena only, then test on CHB-MIT and TUSZ.
 
 For each alarm, remove one channel at a time and measure how much the risk score drops. As a sanity check, run the same thing on a model with randomized weights.
 
-**Pass:** there's an attribution for every alarm in the test set, and it differs from the randomized-model attributions.
+**Pass:** there's an attribution for every alarm in the test set, and it differs from the randomized model attributions.
 
 **Evidence:** `results/d2/attribution/`
 
@@ -300,7 +300,7 @@ Check the README against the course plan: data use, code written, tests run, ver
 
 ### 6.3 Deliverable 3
 
-Live tests use my own seizure-free EEG recorded on an OpenBCI Cyton. Since there are no seizures, every alarm in a live session is a false alarm. These tests measure false alarms and system behavior, not sensitivity. I'll photograph electrode placement before each session. Raw live recordings stay in `data/` and don't get committed. Before posting anything from my own recordings, I'll check with the instructor whether it needs an IRB determination.
+Live tests use my own seizure free EEG recorded on an OpenBCI Cyton. Since there are no seizures, every alarm in a live session is a false alarm. These tests measure false alarms and system behavior, not sensitivity. I'll photograph electrode placement before each session. Raw live recordings stay in `data/` and don't get committed. Before posting anything from my own recordings, I'll check with the instructor whether it needs an IRB determination. (nnice to have)
 
 #### VT-21 Replay consistency
 *REQ-U1 · verification*
@@ -332,7 +332,7 @@ Log processing time per window during a 60 min live session.
 #### VT-24 Live baseline
 *REQ-R3 · verification*
 
-Compute the per-subject baseline from the first 10 min of each session and save it before alarm evaluation starts.
+Compute the per subject baseline from the first 10 min of each session and save it before alarm evaluation starts.
 
 **Pass:** every session has a baseline file timestamped before its first evaluated window.
 
@@ -341,7 +341,7 @@ Compute the per-subject baseline from the first 10 min of each session and save 
 #### VT-25 Seizure-free live session
 *REQ-R4 · verification*
 
-At least 60 min of resting, seizure-free recording after the baseline period.
+At least 60 min of resting, seizure free recording after the baseline period.
 
 **Pass:** the session report has duration, alarm count and alarm times, and there's less than 1 alarm per 10 min (course plan target). The rate is also compared with the D2 target of 5 per 24 h.
 
@@ -350,7 +350,7 @@ At least 60 min of resting, seizure-free recording after the baseline period.
 #### VT-26 Artifact robustness (nice to have)
 *REQ-M1, REQ-A1 · characterization*
 
-Live: blinking, jaw clenching, chewing, talking, head movement and walking, 3 × 30 s each with 2 min rest between. Offline: FAR on the artifact-labeled segments in TUAR.
+Live: blinking, jaw clenching, chewing, talking, head movement and walking, 3 × 30 s each with 2 min rest between. Offline: FAR on the artifact labeled segments in TUAR.
 
 **Pass:** alarms (and channel attributions, if VT-19 is done) reported for each artifact type.
 
@@ -383,7 +383,7 @@ Live: blinking, jaw clenching, chewing, talking, head movement and walking, 3 ×
 
 ## 8. Recording results
 
-Each deliverable gets a results file (`D1.md`, `D2.md`, `D3.md`) in `docs/verification_results/` with one row per test: ID, result, pass/fail, evidence path, and the commit hash of this plan. Per-patient results are kept for every test, including failures. The D3 report also compares against the D1 and D2 results.
+Each deliverable gets a results file (`D1.md`, `D2.md`, `D3.md`) in `docs/verification_results/` with one row per test: ID, result, pass/fail, evidence path, and the commit hash of this plan. Per patient results are kept for every test, including failures. The D3 report also compares against the D1 and D2 results.
 
 A deviation is any change to a requirement, method or pass criterion after v1.0. It gets a new plan version and an entry in Section 9 explaining why.
 
