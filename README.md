@@ -20,7 +20,7 @@ preictal_classifier_v2 is a ground up rebuild of the AuraSense seizure predictio
 
 * **Prediction across patients doesn't work.** A model trained on other people and tested on someone new is at or near chance from brain waves alone (AUROC 0.556 in D1; 0.614 in D2, almost all of it from the time of day).
 * **Personalization works.** A model that also learns the person's own earlier seizures does clearly better, and the gain held on every dataset.
-* **The final test was on new patients with wearable EEG.** On 62 sealed SeizeIT2 patients with behind the ear sensors, the frozen design reached AUROC 0.621 (95% CI 0.564–0.671) against 0.547 without personal data. Its alarms warned 38% of seizures at 5.83 false alarms per 24 h, more than 3 times chance.
+* **The final test was on new patients with wearable EEG.** On 62 sealed SeizeIT2 patients with behind the ear sensors, the frozen design reached AUROC 0.621 against 0.547 without personal data. Its alarms warned 38% of seizures at 5.83 false alarms per 24 h, more than 3 times chance.
 * **A device that keeps learning its wearer predicts better over time,** but its alarm thresholds need to keep adapting too: false alarms rose to 13.8 per 24 h.
 * **It isn't a usable warning device yet.** The course target (80% of seizures at ≤ 5 false alarms per 24 h) was not met. The evidence points to a continuously personalizing device as the way forward; see the [D2 final analysis](docs/final_analysis.md).
 
@@ -44,7 +44,7 @@ Development follows design control practices. Requirements and pass/fail criteri
 
 Full rules, including edge cases such as clustered seizures and gaps in recordings, are in Section 3 of the [verification plan](docs/verification_plan.md).
 
-## Defining normal EEG: why a 4-hour gap
+## Defining normal EEG: why a 4 hour gap
 
 To count false alarms fairly, the software needs stretches of EEG that are clearly normal: far enough from any seizure that nothing seizure related is going on. Here, "normal" (interictal) means at least 4 hours from any seizure, before or after. Everything between that gap and the 30-minute warning window is left out of training and testing.
 
