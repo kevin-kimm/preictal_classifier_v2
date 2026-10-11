@@ -26,7 +26,7 @@ preictal_classifier_v2 is a ground up rebuild of the AuraSense seizure predictio
 
 ## Intended use 
 
-*Software that analyzes continuous scalp EEG from a person with epilepsy and alerts that person when a seizure is likely to begin within the next 30 minutes and at least 5 seconds before onset, so they can move to a safe place or follow their seizure action plan.*
+Software that analyzes continuous scalp EEG from a person with epilepsy and alerts that person when a seizure is likely to begin within the next 30 minutes and at least 5 seconds before onset, so they can move to a safe place or follow their seizure action plan.
 
 
 Development follows design control practices. Requirements and pass/fail criteria are written and committed in the [verification test plan](docs/verification_plan.md) before any testing, and every result is traced back to that plan.
