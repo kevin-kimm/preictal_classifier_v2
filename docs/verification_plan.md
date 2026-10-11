@@ -1,12 +1,12 @@
 # Verification Test Plan: preictal_classifier_v2
 
-Version 1.0, frozen 2026-09-25. Author: Kevin Kim.
+Version 1.0 frozen 2026-09-25 
 
 ## 1. Purpose
 
 This plan lists every test for Deliverables 1–3, how each one is run, and what counts as a pass or fail. I'm writing it before any testing and freezing it in Git as v1.0, so the commit history shows the criteria came first.
 
-Results go in `docs/verification_results/` (one file per deliverable), including failed tests and per patient data. Each results file cites the commit hash of the plan version it was tested against. If something has to change after v1.0, it becomes a new version with the reason logged in Section 9. Criteria don't get edited to fit results.
+Results go in `docs/verification_results/` (one file per deliverable), including failed tests and per patient data. Each results file cites the commit hash of the plan version it was tested against. If something has to change after v1.0, it becomes a new version with the reason logged in Section 9. Criteria don't get edited to fit results (potentially what happened in version 1!).
 
 There are two kinds of test. Verification tests have a pass/fail threshold. Characterization tests measure and report something I don't have a defensible threshold for yet.
 
@@ -22,11 +22,11 @@ The 18 derivations:
 | Right parasagittal | Fp2-F4, F4-C4, C4-P4, P4-O2 |
 | Midline | Fz-Cz, Cz-Pz |
 
-For live tests, the Cyton's 8 electrodes go at F7, T7, P7, O1, F8, T8, P8 and O2. That gives 6 derivations along both temporal chains (F7-T7, T7-P7, P7-O1, F8-T8, T8-P8, P8-O2) and skips Fp1/Fp2, which pick up a lot of blink artifact.
+For live tests, the Cyton's 8 electrodes go at F7, T7, P7, O1, F8, T8, P8 and O2. That gives 6 derivations along both temporal chains (F7-T7, T7-P7, P7-O1, F8-T8, T8-P8, P8-O2) and skips Fp1/Fp2, which pick up a lot of blink artifacts.
 
-**D-5. Interictal data in TUSZ.** Many TUSZ sessions are short, and the time between sessions isn't known precisely. For TUSZ patients with at least one seizure, sessions with no seizure count as interictal. Sessions that contain a seizure give no interictal windows unless file start times show a window is at least 4 h from every seizure in that session. TUSZ patients with no annotated seizures aren't used for training, since some may not have epilepsy. Their recordings are used as a separate false-alarm test set.
+**D-5. Interictal data in TUSZ.** Many TUSZ sessions are short, and the time between sessions isn't known precisely. For TUSZ patients with at least one seizure, sessions with no seizure count as interictal. Sessions that contain a seizure give no interictal windows unless file start times show a window is at least 4 h from every seizure in that session. TUSZ patients with no annotated seizures aren't used for training, since some may not have epilepsy. Their recordings are used as a separate false alarm test set.
 
-**D-6. LOPO vs. grouped cross-validation.** Five seeds times one fold per patient could take days on a laptop if TUSZ adds a lot of patients. If the label report (VT-07) finds more than 40 eligible test patients, I'll use patient-grouped 10-fold cross-validation instead of LOPO, with fold assignment using seed 0. Every patient is still only tested by a model that never saw their data. Results say which scheme was used.
+**D-6. LOPO vs. grouped cross-validation.** Five seeds times one fold per patient could take days on a laptop if TUSZ adds a lot of patients. If the label report (VT-07) finds more than 40 eligible test patients, I'll use patient grouped 10-fold cross validation instead of LOPO, with fold assignment using seed 0. Every patient is still only tested by a model that never saw their data. Results say which scheme was used.
 
 ## 3. Definitions
 
@@ -59,7 +59,7 @@ Times are in seconds from the start of each continuous recording. Seizure onsets
 
 **Seeds.** 0, 1, 2, 3 and 4, fixed here. Every model result is reported for all five seeds as mean ± SD. No seeds get dropped or swapped after seeing results.
 
-**Thresholds.** In each cross-patient fold, 20% of the training patients are held out as an inner validation set, chosen with that fold's seed. The operating threshold is the lowest one that keeps inner-validation FAR at or below the target: 10 per 24 h for D1, 5 per 24 h for D2. The test patient is never used for thresholds, normalization, or any other tuning.
+**Thresholds.** In each cross patient fold, 20% of the training patients are held out as an inner validation set, chosen with that fold's seed. The operating threshold is the lowest one that keeps inner-validation FAR at or below the target: 10 per 24 h for D1, 5 per 24 h for D2. The test patient is never used for thresholds, normalization, or any other tuning.
 
 **Confidence intervals.** 95%, bootstrapped over patients (1000 resamples, seed 0).
 
