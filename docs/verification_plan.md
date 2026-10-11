@@ -37,11 +37,11 @@ Times are in seconds from the start of each continuous recording. Seizure onsets
 | Seizure event | An annotated seizure. A seizure that starts less than 30 min after the previous one ends is merged into it. |
 | Eligible seizure | A seizure event with at least 90% of its preictal window recorded. Only these get preictal labels and count toward sensitivity. The number of ineligible seizures is reported per patient. |
 | Preictal | Onset − 30 min to onset − 5 s. In Winterhalder et al. (2003) terms: SPH = 5 s, SOP = 29 min 55 s. |
-| SPH gap | The last 5 s before onset. Not used for training or window-level metrics. |
+| SPH gap | The last 5 s before onset. Not used for training or window level metrics. |
 | Ictal | Onset to offset of any annotated seizure, including merged and ineligible ones. |
 | Interictal | At least 4 h from every seizure onset and offset in the same recording timeline. TUSZ uses D-5. |
 | Excluded | Everything else, e.g. 30 min to 4 h before onset, or up to 4 h after offset. Not used for training or window metrics, but false alarms during excluded time still count. |
-| Window label | Set by the window's end time, since that's when a real-time system would output the score. |
+| Window label | Set by the window's end time, since that's when a real time system would output the score. |
 | Eligible test patient | At least one eligible seizure and at least 1 h of interictal data. Other patients can still be used for training. |
 | Alarm | A warning from the alarm logic, followed by a 30 min refractory period with no new alarms. |
 | True / false alarm | True if a seizure onset follows within 5 s to 30 min. Otherwise false. |
