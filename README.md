@@ -1,14 +1,13 @@
 # preictal_classifier_v2
 
-Cross-patient seizure forecasting from scalp EEG. The software watches a continuous EEG signal and warns the user when a seizure is likely to begin within the next 30 minutes, at least 5 seconds before onset.
+Cross patient seizure forecasting from scalp EEG. The software watches a continuous EEG signal and warns the user when a seizure is likely to begin within the next 30 minutes, at least 5 seconds before onset.
 
-> **Research prototype.** This software is not a medical device, has not been clinically validated, and must not be used to make medical decisions.
 
-**Status:** Deliverable 2 in progress · **Author:** Kevin Kim · **Predecessor:** [preictal_classifier (AuraSense v1)](https://github.com/kevin-kimm/preictal_classifier)
+**Status:** Deliverable 2 in progress · **Predecessor:** [preictal_classifier (AuraSense v1)](https://github.com/kevin-kimm/preictal_classifier)
 
 ## Overview
 
-preictal_classifier_v2 is a ground-up rebuild of the AuraSense seizure prediction algorithm, scoped as a Software as a Medical Device (SaMD) prototype. It reuses some public datasets from v1, but no code or models. The software has four components.
+preictal_classifier_v2 is a ground up rebuild of the AuraSense seizure prediction algorithm, scoped as a Software as a Medical Device (SaMD) prototype. It reuses some public datasets from v1, but no code or models. The software has four components.
 
 | Component | What it does |
 |---|---|
@@ -21,17 +20,16 @@ preictal_classifier_v2 is a ground-up rebuild of the AuraSense seizure predictio
 
 * **Prediction across patients doesn't work.** A model trained on other people and tested on someone new is at or near chance from brain waves alone (AUROC 0.556 in D1; 0.614 in D2, almost all of it from the time of day).
 * **Personalization works.** A model that also learns the person's own earlier seizures does clearly better, and the gain held on every dataset.
-* **The final test was on new patients with wearable EEG.** On 62 sealed SeizeIT2 patients with behind-the-ear sensors, the frozen design reached AUROC 0.621 (95% CI 0.564–0.671) against 0.547 without personal data. Its alarms warned 38% of seizures at 5.83 false alarms per 24 h, more than 3 times chance.
+* **The final test was on new patients with wearable EEG.** On 62 sealed SeizeIT2 patients with behind the ear sensors, the frozen design reached AUROC 0.621 (95% CI 0.564–0.671) against 0.547 without personal data. Its alarms warned 38% of seizures at 5.83 false alarms per 24 h, more than 3 times chance.
 * **A device that keeps learning its wearer predicts better over time,** but its alarm thresholds need to keep adapting too: false alarms rose to 13.8 per 24 h.
 * **It isn't a usable warning device yet.** The course target (80% of seizures at ≤ 5 false alarms per 24 h) was not met. The evidence points to a continuously personalizing device as the way forward; see the [D2 final analysis](docs/final_analysis.md).
 
-## Intended use (draft)
+## Intended use 
 
 *Software that analyzes continuous scalp EEG from a person with epilepsy and alerts that person when a seizure is likely to begin within the next 30 minutes and at least 5 seconds before onset, so they can move to a safe place or follow their seizure action plan.*
 
-As a provisional SaMD framing under the IMDRF risk categorization, the output drives an immediate user action in a condition that is at least serious, which would place it in Category II or higher. This framing guides the design and the rigor of verification for a course project; it is not a regulatory determination.
 
-Development follows design-control practices in a lightweight form. Requirements and pass/fail criteria are written and committed in the [verification test plan](docs/verification_plan.md) before any testing, and every result is traced back to that plan.
+Development follows design control practices. Requirements and pass/fail criteria are written and committed in the [verification test plan](docs/verification_plan.md) before any testing, and every result is traced back to that plan.
 
 ## Key definitions
 
@@ -48,7 +46,7 @@ Full rules, including edge cases such as clustered seizures and gaps in recordin
 
 ## Defining normal EEG: why a 4-hour gap
 
-To count false alarms fairly, the software needs stretches of EEG that are clearly normal: far enough from any seizure that nothing seizure-related is going on. Here, "normal" (interictal) means at least 4 hours from any seizure, before or after. Everything between that gap and the 30-minute warning window is left out of training and testing.
+To count false alarms fairly, the software needs stretches of EEG that are clearly normal: far enough from any seizure that nothing seizure related is going on. Here, "normal" (interictal) means at least 4 hours from any seizure, before or after. Everything between that gap and the 30-minute warning window is left out of training and testing.
 
 The gap guards against two things:
 
@@ -73,13 +71,13 @@ The 4-hour gap was fixed in the [verification plan](docs/verification_plan.md) b
 | 2 h | 675 h | 39 h | 4 | 21 + 3 = 24 |
 | 4 h | 564 h | 22 h | 4 | 20 + 3 = 23 |
 
-A 2-hour gap adds almost nothing, while a 1-hour gap would triple the number of testable Siena patients, because Siena's seizures come close together. (The personalized runs used 22 patients at 4 hours rather than 23, because they count normal EEG in 30-second windows, so one patient sits just under the 1-hour minimum.)
+A 2 hour gap adds almost nothing, while a 1 hour gap would triple the number of testable Siena patients, because Siena's seizures come close together. (The personalized runs used 22 patients at 4 hours rather than 23, because they count normal EEG in 30 second windows, so one patient sits just under the 1 hour minimum.)
 
 **Plan.**
 
-* **Main results:** the main results, including the final test on SeizeIT2, keep the 4-hour gap.
-* **1-hour sensitivity analysis:** after the final design is frozen, it will be tested once with a 1-hour gap on CHB-MIT and Siena and reported alongside, to show whether the conclusions depend on this choice.
-* **Possible later experiment:** training with the extra normal EEG a 1-hour gap provides, while testing only against the 4-hour definition.
+* **Main results:** the main results, including the final test on SeizeIT2, keep the 4 hour gap.
+* **1 hour sensitivity analysis:** after the final design is frozen, it will be tested once with a 1-hour gap on CHB-MIT and Siena and reported alongside, to show whether the conclusions depend on this choice.
+* **Possible later experiment:** training with the extra normal EEG a 1 hour gap provides, while testing only against the 4-hour definition.
 
 A plain-language explanation with figures is in [`docs/notes/normal_EEG_gap.pdf`](docs/notes/normal_EEG_gap.pdf).
 
@@ -108,7 +106,7 @@ The counts below come from the data audit (verification test VT-01, [`results/d1
 
 In CHB-MIT, cases chb01 and chb21 come from the same person and are treated as one patient in cross-patient splits.
 
-TUSZ can't be used for prediction: its start times are anonymized and its files are at most 30 minutes long, so no TUSZ seizure has its 30-minute lead-up recorded (finding F-13 in the [D1 results](docs/verification_results/D1.md)). It is used for false alarm testing instead. After labeling, 25 patients can be test patients: 21 from CHB-MIT and 4 from Siena.
+TUSZ can't be used for prediction: its start times are anonymized and its files are at most 30 minutes long, so no TUSZ seizure has its 30 minute lead up recorded (finding F-13 in the [D1 results](docs/verification_results/D1.md)). It is used for false alarm testing instead. After labeling, 25 patients can be test patients: 21 from CHB-MIT and 4 from Siena.
 
 ### SeizeIT2: data kept for the final test
 
@@ -214,9 +212,9 @@ Tunable parameters, including the preictal window, sampling rate, alarm refracto
 
 ## Evaluation protocol
 
-Personalized designs are evaluated by leaving one seizure out at a time within each patient, with buffers so that nothing near the test seizure is trained on. Choices between designs were made by nested selection or by rules fixed in advance, and the final design was tested once on sealed data (the SeizeIT2 lockbox). Cross-patient models are evaluated with leave-one-patient-out (LOPO) validation over the 25 eligible test patients: each patient is scored by a model that never saw any of their data. D1 models are trained on CHB-MIT and Siena. The full setup, fixed before any model was trained, is in [`docs/evaluation_methods.md`](docs/evaluation_methods.md). If the number of eligible patients makes LOPO impractical on a laptop, patient-grouped 10-fold cross-validation is used instead, under a rule fixed in advance (decision D-6 in the verification plan). Five random seeds are fixed in advance and all five are reported. Alarm thresholds are chosen on a validation subset of the training patients only, never on the test patient.
+Personalized designs are evaluated by leaving one seizure out at a time within each patient, with buffers so that nothing near the test seizure is trained on. Choices between designs were made by nested selection or by rules fixed in advance, and the final design was tested once on sealed data (the SeizeIT2 lockbox). Cross patient models are evaluated with leave one patient out (LOPO) validation over the 25 eligible test patients: each patient is scored by a model that never saw any of their data. D1 models are trained on CHB-MIT and Siena. The full setup, fixed before any model was trained, is in [`docs/evaluation_methods.md`](docs/evaluation_methods.md). If the number of eligible patients makes LOPO impractical on a laptop, patient grouped 10 fold cross validation is used instead, under a rule fixed in advance (decision D-6 in the verification plan). Five random seeds are fixed in advance and all five are reported. Alarm thresholds are chosen on a validation subset of the training patients only, never on the test patient.
 
-Window-level performance is measured by AUROC (preictal vs interictal) and a three-class confusion matrix. Event-level performance is measured by the fraction of seizures warned in time, false alarms per 24 hours, time spent in warning, and warning time, and is compared with a random predictor raising alarms at the same rate. Exact definitions and pass/fail criteria are in the [verification plan](docs/verification_plan.md).
+Window level performance is measured by AUROC (preictal vs interictal) and a three class confusion matrix. Event level performance is measured by the fraction of seizures warned in time, false alarms per 24 hours, time spent in warning, and warning time, and is compared with a random predictor raising alarms at the same rate. Exact definitions and pass/fail criteria are in the [verification plan](docs/verification_plan.md).
 
 ## Tests
 
