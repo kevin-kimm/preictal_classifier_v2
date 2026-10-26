@@ -2,7 +2,7 @@
 
 | Doc | Version | Written |
 |---|---|---|---|
-| EVM-001 | 1.24 | v1.0 before any model was trained; v1.1 and v1.2 after D1, before any D2 result / v1.3 after a one seed D2 preview / v1.4 after the full D2 run / v1.5 after the personalized variants / v1.6 while the v1.5 test was running, before any v1.6 result / v1.7 before the lockbox audit / v1.8 and v1.9 after it / v1.10 before the final development round / v1.11 before splitting SeizeIT2 / v1.12 during the final development round / v1.13 freezes the design / v1.14 ... / v1.15 adds the sensitivity analysis and SeizeIT2 adapter details / v1.16 the dry run and lockbox commands / v1.17 fixes the lockbox protocol before the lockbox is opened / v1.18 records the lockbox AUROC result and changes the alarm part before any alarm result was seen / v1.19 adds the continuous personalization simulation before running it / v1.20 starts v3 development with adaptive thresholds / v1.21 records that result and adds the false alarm breakdown / v1.22 adopts the v3 scope and adds the first Phase A experiment / v1.23 records its result, a recorded deviation, and Phase A experiment 2 / v1.24 records experiment 2's result and a Phase B secondary question (see Section 13) |
+| EVM-001 | 1.25 | v1.0 before any model was trained; v1.1 and v1.2 after D1, before any D2 result / v1.3 after a one seed D2 preview / v1.4 after the full D2 run / v1.5 after the personalized variants / v1.6 while the v1.5 test was running, before any v1.6 result / v1.7 before the lockbox audit / v1.8 and v1.9 after it / v1.10 before the final development round / v1.11 before splitting SeizeIT2 / v1.12 during the final development round / v1.13 freezes the design / v1.14 ... / v1.15 adds the sensitivity analysis and SeizeIT2 adapter details / v1.16 the dry run and lockbox commands / v1.17 fixes the lockbox protocol before the lockbox is opened / v1.18 records the lockbox AUROC result and changes the alarm part before any alarm result was seen / v1.19 adds the continuous personalization simulation before running it / v1.20 starts v3 development with adaptive thresholds / v1.21 records that result and adds the false alarm breakdown / v1.22 adopts the v3 scope and adds the first Phase A experiment / v1.23 records its result, a recorded deviation, and Phase A experiment 2 / v1.24 records experiment 2's result and a Phase B secondary question / v1.25 adds the D2 improvement round after the D1 feedback, before any of its results (see Section 13) |
 
 This document fixes how models are trained, tuned and scored for Deliverables 1 and 2. It adds detail to the verification plan (tag `vtp-1.0`) and doesn't change any of its pass/fail criteria. It is committed before any model is trained so the Git history shows these choices came first. Anything changed after results are seen goes in the version history (Section 11).
 
@@ -496,6 +496,10 @@ After 5 or more learned seizures, `patient_only` scored 0.664 against 0.580 (9 o
 * the paired AUROC of `patient_only` against `personal`, over steps after 5 or more learned seizures and over all steps after at least 1;
 * the alarms of both under `fast`.
 
+### 11.14 D2 improvement round (v1.25)
+
+See Section 14, at the end of this document, after the version history.
+
 ## 12. Lockbox: SeizeIT2 (added in v1.7)
 
 SeizeIT2 v1.1.0 (OpenNeuro ds005873, CC0 licence) was downloaded on 2026-09-28 into `data/raw/seizeit2_v1.1.0/`: 24,877 files, 117.2 GiB. It has 125 patients with focal epilepsy, behind-the-ear EEG and other wearable signals. It is kept sealed until the final design is frozen, so it can give one unbiased test of that design.
@@ -553,3 +557,94 @@ SeizeIT2 v1.1.0 (OpenNeuro ds005873, CC0 licence) was downloaded on 2026-09-28 i
 | 1.22 | 2026-10-04 | Adopts the v3 scope (`docs/v3_scope.md`: intended use, success criteria S1 to S3, Phase A and Phase B data plan); Phase A experiment 1, threshold schedules, with its decision rule (Section 11.12) |
 | 1.23 | 2026-10-04 | Experiment 1 result: by the rule, `adaptive` is retained; recorded deviation: `fast` is taken to Phase B (S2). Phase A experiment 2, learning recipes (50%, 75%, patient-only), with its decision rule (Section 11.13) |
 | 1.24 | 2026-10-05 | Experiment 2 result: the 50% blend is kept (no recipe beat it at p < 0.05); patient-only against the blend becomes a pre-registered Phase B secondary question |
+| 1.25 | 2026-10-26 | After the D1 feedback and before any of its results: the D2 improvement round (Section 14). Answers from existing results; challengers to the frozen design (training preictal length, per-patient length, windows that straddle two states, infra-slow features) with an adoption rule; alarms, PPV/NPV and confusion matrices from saved scores, with an alarm-settings rule and a warning-window characterization; unsupervised, missed-seizure and interictal-gap characterizations; a second look at the lockbox only if a change is adopted |
+
+## 14. D2 improvement round (v1.25, 2026-10-26), written before any of its results
+
+**Why.** The D1 report came back with comments from the course instructor. They ask whether the 30 min preictal period suits every patient, whether windows that straddle two states hurt accuracy, whether 30 s windows can see infra-slow activity, whether an unsupervised method finds anything, how the device compares with patients' own warning signs, why seeds mattered so much in v1, why fewer channels scored slightly higher, why detection isn't higher, and suggest PPV and a confusion matrix. This round answers each with evidence, and tries to improve the frozen design's AUROC and alarms where the comments suggest a way.
+
+**What data.** The SeizeIT2 lockbox was used once for the frozen design (Sections 11.7–11.8). Every experiment here runs on development patients only: the 22 CHB-MIT and Siena patients of Section 11.1, and the SeizeIT2 development patients (Section 11.6). Results are development results. A change chosen on these patients scores optimistically on them, which is why Section 14.10 describes one confirmatory run.
+
+**Nothing frozen changes.** The frozen code, features, labels and results stay as they are. Every new script reproduces the frozen design first (Sections 14.2 and 14.4) and changes one thing at a time.
+
+### 14.1 Answers from existing results (no new model)
+
+`scripts/analyze_existing_results.py` reads committed result files only:
+
+* **Alarm-level PPV and NPV** for D1, the frozen design on CHB-MIT and Siena, the SeizeIT2 dry run and the lockbox. Definitions are in Section 14.5. Where true alarms weren't saved, warned seizures stand in for them (at most slightly low), and NPV is approximated from counts.
+* **PPV and NPV at home seizure rates** of 1 a day, 1 a week and 1 a month, if the same sensitivity and false-alarm rate held.
+* **D1 window-level confusion matrix,** from the per-patient matrices already in `results/d1/lopo_metrics.csv`.
+* **Seed variability:** per patient and overall, plus the mean when each patient's best seed is kept, to show the selection effect behind v1's 0.713.
+* **Channel subsets (VT-12):** per seed and per patient, with a paired Wilcoxon test against all channels.
+
+### 14.2 Challengers to the frozen design
+
+`scripts/run_d2_plus.py`. Each arm is the frozen design with one change. Every arm uses the same patients, the same leave-one-seizure-out folds and buffers, and the same test windows with the frozen labels (30 min preictal, 4 h interictal), so arms compare patient by patient. Seeds 0 to 4. On each development set, every arm is run alongside the `frozen` arm.
+
+**Equivalence check first.** Before any challenger result is read, the `frozen` arm must reproduce the committed frozen development AUROC for every patient and seed (`--check`, tolerance 10⁻⁹). If it doesn't, the cause is found and fixed before anything else runs.
+
+**The arms:**
+
+1. **`train_pre10`, `train_pre20`, `train_pre45`, `train_pre60`: training preictal length.** Every training window (this patient's and the other patients') is labeled with a preictal period of 10, 20, 45 or 60 min instead of 30. The 5 s horizon, 4 h interictal gap, 30 min merge rule and 90% coverage rule are unchanged, so only windows 0–60 min before seizures move between preictal and excluded. Test labels stay at 30 min. This asks whether a different training definition finds the frozen target better (the instructor's first hypothesis).
+2. **`pp_length`: preictal length chosen per patient, nested.** In each outer fold, the training preictal length is chosen from 10, 20, 30, 45 and 60 min using that fold's training data only. Each training seizure is left out in turn (same buffers), a patient-only model is trained with each length, and the held-out training seizure's 30 min preictal windows are scored against an interictal chunk. The length with the highest pooled AUROC wins; ties go to 30 min, then to the length nearest 30. Folds with fewer than 2 training seizures use 30 min. The outer model then uses that length for this patient's and the other patients' training windows. Patient-only inner models keep the run time manageable; they use `ColumnSubsetModel` (Section 11.13).
+3. **`pure`: no windows that straddle two states.** Training leaves out every window whose start falls in a different state from its end, under the frozen rules (for example a window ending 10 s after onset contains 20 s of preictal EEG). The test windows are unchanged, and every arm that computes this also reports AUROC on test windows that don't straddle two states.
+4. **`slow`: infra-slow features** (Section 14.7), added to the frozen features and scaled by the same personal baseline.
+
+**Risks stated in advance.**
+
+* Labels other than 30 min change what the model learns, but the test target stays 30 min. A shorter training period could rank the last minutes well and the earlier ones badly.
+* `pp_length` chooses among 5 lengths on 1–9 training seizures, so its choices may be noise. It is nested, so that noise lowers its score rather than inflating it.
+* Windows that straddle two states are a small share of any class (at most 6 per seizure boundary), so `pure` is expected to change little.
+* Hospital amplifiers may have removed infra-slow activity (Section 14.7).
+* With about 36 development patients, real gains of 0.01–0.02 may not be distinguishable from noise.
+
+### 14.3 Adoption rule, fixed now
+
+For each arm, take each patient's mean AUROC over seeds, and pool the qualifying patients of both development sets. An arm **qualifies** if:
+
+* its mean AUROC is at least 0.01 higher than the `frozen` arm's on the same patients, and
+* it is higher than the `frozen` arm in more than half of those patients.
+
+An arm must have been run on both development sets to qualify. If no arm qualifies, the frozen design stays. If one qualifies, it is adopted. If two or more qualify, the two best are combined in one more run, and the design adopted is the highest-scoring of the qualifying arms and that combination, by the same pooled mean. The adopted design is called **D2.1**. Its development score is optimistic, because it was chosen on these patients.
+
+### 14.4 Alarms from saved scores
+
+`scripts/run_d2_plus.py --alarms` also saves the out-of-sample training scores that the frozen alarm test uses to choose each fold's threshold (Section 11.2). `scripts/d2_plus_alarms.py` then scores alarms without retraining.
+
+* **Equivalence check first.** The `frozen` arm with `--alarms`, seeds 0 and 1, must reproduce `results/d2/personalized_alarms_frozen.csv` (warned seizures and false alarms per patient, seed and target) exactly, and the SeizeIT2 development file likewise (`d2_plus_alarms.py --check`).
+* **Alarm settings.** Smoothing over 1, 12, 36 or 72 windows × persistence of 1, 3, 6 or 12 windows, each with thresholds re-chosen on the same out-of-sample training scores. **Choice rule, fixed now:** pooled over both development sets, at the ≤ 5 target, the setting with the largest warned share minus chance probability, among settings whose pooled false-alarm rate is at most 5 per 24 h. If no other setting does better, or none meets the rate, the frozen setting (36 and 6) stays (`d2_plus_alarms.py --choose-settings`). A changed setting becomes part of D2.1.
+* **Warning window (the instructor's comment on timing).** The same model and thresholds scored with warning windows of 10, 20, 30, 45 and 60 min. Chance is recomputed for each window, so a shorter window is judged fairly. Alarms in the hour before a seizure that come too early for the window are counted separately ("early alarms"), with a PPV that includes them. This is a characterization; the intended use keeps 30 min.
+
+### 14.5 PPV, NPV and confusion matrices: definitions
+
+None of these is a pass/fail criterion (Section 8): they depend on how often the person has seizures as much as on the device.
+
+* **Alarm PPV:** true alarms ÷ all alarms. A true alarm is followed by a seizure within 5 s to 30 min.
+* **Time PPV and NPV:** every scored window counts once. A warning is on during the 30 min after an alarm. Time PPV is the share of warning time followed by a seizure within 30 min; time NPV is the share of warning-free time with no seizure in the next 30 min.
+* **Window confusion matrix:** preictal against interictal test windows, flagged or not at each fold's alarm threshold on the raw score.
+* **Home rates:** PPV and NPV recomputed for 1 seizure a day, a week and a month, with the same sensitivity and false-alarm rate.
+
+### 14.6 Unsupervised test (characterization)
+
+`scripts/run_unsupervised.py`. On the same folds and test windows, an isolation forest (200 trees, seed 0–4) learns either the fold's interictal training windows (`normal_only`) or all of the patient's training windows whatever their label (`label_free`), on the frozen features with the personal baseline. Its anomaly score is evaluated by AUROC, and its time course over the 4 h before each held-out seizure (never trained on, because of the 4 h buffer) is compared with the same 4 h at the end of an interictal stretch. No result here changes the design.
+
+### 14.7 Infra-slow activity
+
+* **Check first.** `scripts/check_infraslow.py` reads the EDF prefiltering text and plots the median 0.005–3 Hz spectrum of 12 random recordings per dataset (seed 0; SeizeIT2 development patients only), to see whether the amplifiers recorded activity below 0.5 Hz.
+* **Features.** `scripts/extract_slow_features.py` (`src/preictal/features/slow.py`): for the 5 min ending at each window's end, after a causal 3 Hz low-pass and decimation to 8 Hz, power spectra of 100 s Hann segments (5 per look-back). Per derivation: log power at 0.01–0.1 Hz and 0.1–0.5 Hz, and log infra-slow power relative to 0.5–2 Hz, pooled over derivations like the frozen features (12 numbers). The `slow` arm (Section 14.2) is run on both development sets whatever the check shows, and interpreted with it.
+
+### 14.8 Missed seizures (characterization)
+
+`scripts/plot_missed_seizures.py` reruns the D1 model and folds for seed 0 and scores each seizure on its own: the AUROC of the ictal probability for its windows lying entirely inside it, against the patient's interictal windows. Seizures shorter than one window can't be scored this way and are counted separately. It plots the EEG of the three best and three worst detected seizures. The D1 model is unchanged.
+
+### 14.9 Interictal gap (characterization)
+
+The 1 h sensitivity analysis (Section 11.6, F2-15) is extended with 2 h and 8 h gaps, using the existing script unchanged: `scripts/run_personalized.py --feature-set v2 --personal-baseline --no-clock --context-min 10 --variants general_personal --test-gap-h 2 --tag _sens_gap2h` (and 8 h). Patients are selected with each gap, as in Section 11.6.
+
+### 14.10 After the development round
+
+* **If D2.1 differs from the frozen design,** it is frozen (Git tag `freeze-d2.1`) and written here as a new version, together with a runner for the lockbox, before the lockbox is touched. It is then run once on the 62 SeizeIT2 lockbox patients scored in Section 11.8 (AUROC part, seed 0), paired patient by patient with the frozen design's lockbox AUROC, and once on the same 20 patients for alarms. This is a **second look** at those patients: they played no part in any choice, but they aren't untouched. It is reported that way, whatever the result.
+* **If nothing is adopted,** the lockbox isn't opened again, and D2 reports the frozen design's results with the new analyses.
+* **v3 isolation.** Nothing from a D2.1 lockbox result may be used to choose anything in v3. v3 may adopt a D2.1 component only on the strength of development results, and its Phase B stays as planned in Section 11.12.
+
+**Patients' own warning signs (the instructor's comment on prodromes).** This is answered from the literature, not by an experiment. Published e-diary studies report that some patients can predict their own seizures above chance, mostly over 6–12 h windows; in prospective diary studies, prodromes 30 or more minutes ahead are uncommon and weren't better than chance. AuraSense's 30 min window is compared with those numbers in the D2 report.

@@ -165,13 +165,14 @@ preictal_classifier_v2/
 ├── scripts/                  # Command-line entry points
 │   ├── audit_data.py
 │   ├── build_dataset.py
-│   └── run_lopo.py
+│   ├── run_lopo.py
+│   └── run_d2_plus.py ...    # D2 improvement round (see Section 14 of the evaluation methods)
 ├── src/preictal/             # Installable Python package
 │   ├── data/                 # loaders.py, harmonize.py, labels.py
-│   ├── features/             # build_features.py
+│   ├── features/             # build_features.py, slow.py
 │   ├── models/               # model.py, train.py
 │   ├── alarm/                # alarm.py
-│   ├── evaluation/           # lopo.py, metrics.py
+│   ├── evaluation/           # lopo.py, metrics.py, d2_plus.py
 │   ├── live/                 # cyton.py
 │   └── ui/                   # app.py
 ├── tests/                    # Automated verification tests (pytest)
@@ -218,7 +219,7 @@ Window level performance is measured by AUROC (preictal vs interictal) and a thr
 
 ## Tests
 
-188 automated tests run with `python -m pytest -q` from the repository root (about 5 seconds). They cover:
+196 automated tests run with `python -m pytest -q` from the repository root (about 5 seconds). They cover:
 
 * EDF reading and channel harmonization;
 * labeling rules and timelines;
@@ -228,7 +229,8 @@ Window level performance is measured by AUROC (preictal vs interictal) and a thr
 * metric definitions;
 * the patient-specific and forward-in-time splits, including that nothing from the future is trained on;
 * the neural network (with a numerical gradient check);
-* the SeizeIT2 adapter.
+* the SeizeIT2 adapter;
+* the D2 improvement round: alternative labels (preictal length, windows that straddle two states), PPV/NPV and confusion counts, and the causal infra-slow features.
 
 Long verification runs have their own scripts and write their evidence to `results/`. The README itself is checked by `scripts/check_readme.py` (VT-20).
 
@@ -238,6 +240,7 @@ Long verification runs have their own scripts and write their evidence to `resul
 |---|---|---|
 | 1. Rebuild and first evaluation | [`docs/verification_results/D1.md`](docs/verification_results/D1.md) | VT-01 to VT-14 complete (VT-13 failed) |
 | 2. Final prototype with alarm logic | [`docs/verification_results/D2.md`](docs/verification_results/D2.md) | VT-15 and VT-17 failed, VT-16 passed; patient-specific test reported |
+| 2. Improvement round after the D1 feedback | [`docs/d1_feedback_responses.md`](docs/d1_feedback_responses.md), `results/d2_plus/` | Planned (evaluation methods v1.25, Section 14) |
 | 3. Interface and live Cyton test | `docs/verification_results/D3.md` | Not started |
 
 ### Current model metrics
@@ -306,6 +309,7 @@ A planned sensitivity analysis with a 1-hour gap for normal EEG lowered the froz
 | 2 | Continuous-personalization simulation (added) | – | Done (F2-18) |
 | 2 | Final analysis of results | 10% | Done ([final_analysis.md](docs/final_analysis.md)) |
 | 2 | README | 15% | Checked by `scripts/check_readme.py` (VT-20) |
+| 2 | Improvement round after the D1 feedback (added): preictal length, infra-slow features, unsupervised test, PPV/NPV | – | Planned before any result ([evaluation methods](docs/evaluation_methods.md) v1.25, Section 14; [responses](docs/d1_feedback_responses.md)) |
 | 3 (20%) | Local interface showing dataset replay and alarms | 10% | Not started |
 | 3 | Real-time Cyton acquisition, live baseline, seizure-free recording | – | Not started |
 | 3 | Analysis report compared with D1 and D2 | 10% | Not started |
