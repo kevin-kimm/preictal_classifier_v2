@@ -14,6 +14,8 @@ so arms can be compared patient by patient:
                   by leave-one-seizure-out on that fold's training seizures only (patient-only models)
     pure          trained without windows that straddle two states (start and end in different states)
     slow          plus infra-slow features (scripts/extract_slow_features.py must have been run)
+    per_channel   plus each channel's own features, not only their summary across channels (v1.26)
+    blend_patient the average of the frozen model's risk and a patient-only model's risk (v1.26)
 
 Each run also saves every scored window (results/d2_plus/<dataset>/scores/), so alarms, warning-window
 lengths, smoothing and PPV/NPV can be re-scored afterwards without retraining (scripts/d2_plus_alarms.py).
@@ -60,7 +62,9 @@ from preictal.evaluation.metrics import bootstrap_ci  # noqa: E402
 from preictal.evaluation.patient_specific import inner_interictal_folds, patient_folds  # noqa: E402
 from preictal.features.build_features import FEATURE_VERSION_V2, feature_version  # noqa: E402
 from preictal.features.transforms import cache_key, context_features  # noqa: E402
-from preictal.models.model import ColumnSubsetModel, build_model, informative_columns, predict_proba  # noqa: E402
+from preictal.models.model import (  # noqa: E402
+    CLASS_ORDER, ColumnSubsetModel, build_model, informative_columns, predict_proba,
+)
 from preictal.models.train import TRAIN_CLASSES, blend_weights, load_windows, sample_weights  # noqa: E402
 
 try:
@@ -77,6 +81,8 @@ ARMS = {
     "pp_length": {"pp_length": True},
     "pure": {"pure": True},
     "slow": {"slow": True},
+    "per_channel": {"per_channel": True},
+    "blend_patient": {"blend_patient": True},
 }
 ARM_LABELS = {
     "frozen": "Frozen design",
@@ -87,6 +93,8 @@ ARM_LABELS = {
     "pp_length": "Preictal length chosen per patient (nested)",
     "pure": "Trained without windows that straddle two states",
     "slow": "Plus infra-slow features",
+    "per_channel": "Plus per-channel features",
+    "blend_patient": "Average of the frozen model and a patient-only model",
 }
 PP_LENGTHS = (10, 20, 30, 45, 60)            # minutes; 30 is the frozen length and wins ties
 OTHERS_EVERY = 6                             # other patients' windows 30 s apart, as in the frozen runs
@@ -110,6 +118,17 @@ def fit_patient_only(X, y, seed):
     model = build_model(seed)
     model.fit(X[:, keep], y, sample_weight=sample_weights(y, np.zeros(len(y), dtype=int)))
     return ColumnSubsetModel(model, keep)
+
+
+class AverageModel:
+    """Averages the class probabilities of several fitted models (blend_patient arm)."""
+
+    def __init__(self, *models):
+        self.models = models
+        self.classes_ = np.array(CLASS_ORDER)
+
+    def predict_proba(self, X):
+        return np.mean([predict_proba(m, X) for m in self.models], axis=0)
 
 
 def scale(M, ref):
@@ -196,7 +215,12 @@ def main():
     t_start = time.time()
     print("Loading features...")
     # SeizeIT2: development patients only (the lockbox's feature files are never loaded)
-    W = load_windows(features, datasets, subjects=sz_pool if sz2 else None, version=version, keep_per_channel=False)
+    want_pc = any(ARMS[a].get("per_channel") for a in args.arm)
+    W = load_windows(features, datasets, subjects=sz_pool if sz2 else None, version=version, keep_per_channel=want_pc)
+    per_ch = None
+    if want_pc:                       # each channel's features, flattened (absent channels stay missing)
+        per_ch = W.per_channel.reshape(len(W.y), -1).astype(np.float32)
+        W.per_channel = None
     cache = features.parent / "d2_cache" / f"train_ctx10r_{version}_{cache_key(W)}.npy"     # shared with the frozen runs
     if cache.exists():
         ctx = np.load(cache)
@@ -242,18 +266,28 @@ def main():
     if any(ARMS[a].get("slow") for a in args.arm):
         slow = load_slow(W, features, datasets)
 
-    # other patients' rows are scaled by all their own interictal windows (frozen)
+    every6 = np.round(W.t_end / 5.0).astype(np.int64) % OTHERS_EVERY == 0
+    idx6 = np.flatnonzero(every6)
+    pos6 = np.full(len(W.y), -1, dtype=np.int64)
+    pos6[idx6] = np.arange(len(idx6))
+
+    # other patients' rows are scaled by all their own interictal windows (frozen); only the rows other
+    # patients can contribute (every 6th window) are kept, to save memory
     def scaled_all_for(X):
-        S = np.empty_like(X)
+        S = np.empty((len(idx6), X.shape[1]), dtype=X.dtype)
         for code in range(len(W.subjects)):
             r = np.flatnonzero(W.subject == code)
             ref = r[y[r] == INTERICTAL]
-            S[r] = scale(X[r], X[ref]) if len(ref) else X[r]
+            Sr = scale(X[r], X[ref]) if len(ref) else X[r]
+            keep = every6[r]
+            S[pos6[r[keep]]] = Sr[keep]
         return S
 
     mats = {"base": Xf}
     if slow is not None:
         mats["slow"] = np.hstack([Xf, slow])
+    if per_ch is not None:
+        mats["per_channel"] = np.hstack([Xf, per_ch])
     scaled_all = {k: scaled_all_for(v) for k, v in mats.items()}
 
     patients = []
@@ -270,8 +304,6 @@ def main():
     print(f"{len(patients)} patients; arms: {', '.join(args.arm)}; seeds {seeds}"
           + ("; with alarm calibration" if args.alarms else ""))
 
-    every6 = np.round(W.t_end / 5.0).astype(np.int64) % OTHERS_EVERY == 0
-
     def others_rows(subject, ytr_all):
         o = W.rows(pool_subjects - {subject})
         o = o[np.isin(ytr_all[o], TRAIN_CLASSES)]
@@ -279,7 +311,7 @@ def main():
 
     for arm in args.arm:
         spec = ARMS[arm]
-        mkey = "slow" if spec.get("slow") else "base"
+        mkey = "slow" if spec.get("slow") else ("per_channel" if spec.get("per_channel") else "base")
         Mall, Sall = mats[mkey], scaled_all[mkey]
         L_arm = spec.get("train_pre_min", 30)
         ytr_all = train_labels[L_arm].copy()
@@ -328,7 +360,16 @@ def main():
                 rel = rel[np.isin(ylab[rel], TRAIN_CLASSES)]
                 o, yo = others_for(L)
                 wg, wp = blend_weights(yo, W.subject[o], ylab[rel], 0.5)
-                return fit(np.vstack([Sall[o], P[rel]]), np.concatenate([yo, ylab[rel]]), np.concatenate([wg, wp]), seed)
+                X = np.vstack([Sall[pos6[o]], P[rel]])
+                if spec.get("per_channel"):        # channels absent everywhere carry no values; drop such columns
+                    keep = informative_columns(X)
+                    model = ColumnSubsetModel(fit(X[:, keep], np.concatenate([yo, ylab[rel]]),
+                                                  np.concatenate([wg, wp]), seed), keep)
+                else:
+                    model = fit(X, np.concatenate([yo, ylab[rel]]), np.concatenate([wg, wp]), seed)
+                if spec.get("blend_patient"):
+                    return AverageModel(model, fit_patient_only(P[rel], ylab[rel], seed))
+                return model
 
             for seed in seeds:
                 if (arm, subject, seed, args.alarms) in done:

@@ -11,7 +11,7 @@ The D1 report came back with comments from the course instructor. Each one is an
 | 3 | Is 30 s sufficient? Infra-slow oscillations. | Check whether the amplifiers recorded below 0.5 Hz, then 5-minute infra-slow features as a challenger (Section 14.7) | Check done (below); challenger pending |
 | 4 | If a window contains two states (e.g. a seizure starts at 22 s), how is it classified? Could edge cases hurt accuracy? | By design (below), plus a challenger trained without such windows and AUROC on test windows without them (Section 14.2) | Design answer done; experiment pending |
 | 5 | Did you only use 25 people out of the datasets? | Below | Done |
-| 6 | Seizure detection (0.865): surprised it isn't higher. Can you see the difference in the missed seizures? | Per-seizure detection scores and EEG of the best and worst detected seizures (Section 14.8) | Scores done (below); visual review pending |
+| 6 | Seizure detection (0.865): surprised it isn't higher. Can you see the difference in the missed seizures? | Per-seizure detection scores and EEG of the best and worst detected seizures (Section 14.8) | Done |
 | 7 | PPV would be useful, and a confusion matrix. | PPV, NPV and confusion matrices for every alarm result, at hospital and home seizure rates (Sections 14.1, 14.5) | Existing results done (below); new runs pending |
 | 8 | Surprised changing the seed has such a large effect with a larger dataset. | Seed variability per patient and overall (Section 14.1), and the explanation below | Done |
 | 9 | Fewer channels scoring higher: does that make sense? | Seed-by-seed and patient-by-patient test (Section 14.1) | Done |
@@ -34,6 +34,8 @@ Before testing infra-slow features, `scripts/check_infraslow.py` looked at the m
 | CHB-MIT | 0.004 | +1.53 | Power falls steeply below 0.5 Hz: the amplifiers' high-pass filter removed infra-slow activity. No feature can recover it |
 | Siena | 0.77 | −0.46 | Some slow activity recorded, despite the header's "HP 1.59 Hz" (probably a display setting) |
 | SeizeIT2 | 7.7 | −1.13 | Strong low-frequency power. In a wearable this includes electrode drift and movement as well as brain activity |
+
+The spectra (`results/d2_plus/infraslow_check.png`) make this plain. CHB-MIT's power falls by almost three orders of magnitude from 0.5 Hz down to 0.01 Hz. Siena's stays flat across the infra-slow range. SeizeIT2's rises to about ten times Siena's, which is more than brain activity alone would give and points to electrode drift and movement in a wearable.
 
 So for most of the development data (CHB-MIT), a longer window can't add infra-slow information; the 10 min context features already give the frozen design a longer look at the 0.5–45 Hz features. The `slow` challenger still runs on both development sets as planned, and SeizeIT2 is where it has a chance.
 
@@ -71,7 +73,15 @@ All 37 CHB-MIT and Siena subjects train the cross-patient model; 25 of them can 
 | Shorter than 60 s | 36 | 0.981 | 56% | 31% |
 | 60 s or longer | 72 | 0.941 | 58% | 33% |
 
-Most seizures are detected almost perfectly, by a model that has never seen the patient. The pooled 0.865 is pulled down by about a third of seizures that the model misses, and they cluster in a few children (chb13, chb15, chb01, chb08). Several score well below 0.5: the model gives *less* seizure probability during them than during normal EEG, so these seizures look unlike any it learned from other patients, rather than merely faint. Duration doesn't explain it (short and long seizures score alike). Seizures shorter than one 30 s window have no window entirely inside them and aren't in this table.
+Most seizures are detected almost perfectly, by a model that has never seen the patient. The pooled 0.865 is pulled down by about a third of seizures that the model misses, and they cluster in a few children (chb13, chb15, chb01, chb08). Several score well below 0.5: the model gives *less* seizure probability during them than during normal EEG, so these seizures look unlike any it learned from other patients, rather than merely faint. Duration doesn't explain it (short and long seizures score alike). Of the test patients' 151 seizures, 43 are shorter than one 30 s window, so no window lies entirely inside them and they aren't in this table. They are part of why D1's pooled detection (0.810 over all ictal windows, 0.865 over windows entirely inside a seizure) is lower than the typical seizure's.
+
+**Can you see the difference?** Yes (`results/d2_plus/missed_seizures.png`, three worst and three best detected seizures, 20 s before to 40 s after onset):
+
+* **Missed (chb13, two seizures):** the seizure is clearly visible by eye. A rhythmic discharge starts about 5 s after onset, but only on the frontal and left temporal channels (Fp1-F7, F7-T7, Fp2-F8), at about twice the background amplitude. The other channels barely change.
+* **Missed (chb15):** within the first 40 s there is no obvious change on these 8 channels; the seizure may start elsewhere (central or midline channels) or build up later.
+* **Detected (chb09, chb11, chb19):** large, fast, widespread activity on every channel, many times the background amplitude.
+
+So the model detects seizures that change the whole head strongly and misses ones that stay focal and moderate. That fits how the features are built: each feature is summarized across the 18 channels by mean, SD, minimum and maximum, so a change on 3 channels moves the summary much less than a change on all 18. Seen from other patients, a frontal rhythm can also look like eye-movement artifact, which is common in normal EEG; that would explain why these seizures score *below* normal EEG. A personalized model (which learns the patient's own seizures) or per-channel features would be expected to catch them; per-channel features are already on the v3 list.
 
 ## 7. PPV, NPV and confusion matrices
 
@@ -82,12 +92,12 @@ From the alarm results already committed (`results/d2_plus/existing_results.md`)
 | D1, cross-patient | 21% | 10.6 | 0.06 | 0.94 | 2.7 |
 | Frozen design, CHB-MIT and Siena | 16% | 3.4 | 0.18 | 0.92 | 4.3 |
 | Frozen design, SeizeIT2 development | 46% | 4.6 | 0.28 | 0.95 | 3.6 |
-| Frozen design, SeizeIT2 lockbox (20 new patients) | 38% | 5.8 | 0.09 | 0.98 | 1.5 |
-| Other patients only, same lockbox patients | 12% | 4.9 | 0.04 | 0.97 | 1.5 |
+| Frozen design, SeizeIT2 lockbox (20 new patients) | 38% | 5.8 | 0.10 | 0.98 | 1.6 |
+| Other patients only, same lockbox patients | 12% | 4.9 | 0.04 | 0.97 | 1.6 |
 
 (All at the ≤ 5 false alarms per 24 h setting, except D1's ≤ 10.)
 
-* **On the lockbox, about 1 alarm in 11 was followed by a seizure.** At home seizure rates it would be lower: about 1 in 16 at one seizure a day, and about 1 in 110 at one a week. That is the clearest way to say the device isn't ready, and why the false-alarm rate matters as much as sensitivity.
+* **On the lockbox, about 1 alarm in 10 was followed by a seizure.** At home seizure rates it would be lower: about 1 in 16 at one seizure a day, and about 1 in 110 at one a week. That is the clearest way to say the device isn't ready, and why the false-alarm rate matters as much as sensitivity.
 * **NPV is high for every model,** including the near-chance ones, because almost every 30 minutes is seizure-free. A device that never alarmed would score about the same, so NPV says little here.
 * **D1's window-level confusion matrix** (most likely class, preictal vs interictal): sensitivity 0.30, specificity 0.73, PPV 0.09 with 8.6% of windows preictal. A PPV barely above the share of preictal windows matches D1's near-chance AUROC.
 

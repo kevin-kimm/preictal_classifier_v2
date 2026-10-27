@@ -198,7 +198,8 @@ def draw(ranked, W, p_ictal, out, args, cfg):
         ax.set_yticks([-i * gap for i in range(len(idx))])
         ax.set_yticklabels(SHOW if col == 0 else [], fontsize=7)
         kind = "worst" if col < N_SHOW else "best"
-        ax.set_title(f"{kind}: {s['subject'].split(':')[1]}\nAUROC {s['auroc']:.2f}, ~{s['approx_duration_s']:.0f} s",
+        ax.set_title(f"{kind}: {s['subject'].split(':')[1]}\nAUROC {s['auroc']:.2f}, ~{s['approx_duration_s']:.0f} s, "
+                     f"rows {gap:.0f} µV apart",
                      fontsize=8)
         m = (W.subject == W.subjects.index(s["subject"])) & (np.array(W.timelines)[W.timeline] == s["timeline"]) \
             & (W.t_end >= t0) & (W.t_end <= t1)
@@ -208,7 +209,6 @@ def draw(ranked, W, p_ictal, out, args, cfg):
         axp.set_xlabel("s from onset", fontsize=8)
         if col == 0:
             axp.set_ylabel("ictal prob.", fontsize=8)
-    fig.suptitle(f"Scale: rows {gap:.0f} µV apart (last column)", fontsize=8)
     fig.tight_layout()
     fig.savefig(out / "missed_seizures.png", dpi=150)
     return "Figure: `results/d2_plus/missed_seizures.png`"
