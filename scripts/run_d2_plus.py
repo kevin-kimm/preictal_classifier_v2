@@ -177,6 +177,9 @@ def main():
     ap.add_argument("--patients", nargs="+", default=None, help="only these patients (quick previews)")
     ap.add_argument("--out", type=Path, default=None)
     ap.add_argument("--report-only", action="store_true", help="rebuild arms.md from progress.jsonl")
+    ap.add_argument("--import-frozen", action="store_true",
+                    help="record the committed frozen AUROCs (for --seeds) as the frozen arm, after --check passed "
+                         "(evaluation methods v1.27); seeds missing from the committed file are left to be run")
     args = ap.parse_args()
 
     sz2 = args.dataset == "seizeit2"
@@ -198,6 +201,10 @@ def main():
             done[(r["arm"], r["subject"], r["seed"], r.get("alarms", False))] = r
     if args.report_only:
         write_report(out, done, args.dataset)
+        return
+    if args.import_frozen:
+        n = import_frozen(out, progress, done, seeds, args.dataset)
+        print(f"Imported {n} frozen results into {progress}")
         return
 
     features = REPO / "data" / "processed" / ("features_seizeit2" if sz2 else "features_v2")
@@ -430,9 +437,8 @@ def main():
                                     f"{'_alarms' if args.alarms else ''}.npz",
                                     subject=subject, seizures=len(events), timelines=np.array(W.timelines), **arrays)
                 done[(arm, subject, seed, args.alarms)] = rec
-                if not args.check:
-                    with open(progress, "a") as fh:
-                        fh.write(json.dumps(rec) + "\n")
+                with open(progress, "a") as fh:      # check runs go to check_progress.jsonl
+                    fh.write(json.dumps(rec) + "\n")
 
     if args.check:
         check_against_frozen(out, done, seeds, args.dataset)
@@ -480,19 +486,43 @@ def choose_length(P, t, yt, tl, allowed, events_sorted, held_out, train_labels, 
     return 30 if valid.get(30) == best else min((L for L, v in valid.items() if v == best), key=lambda L: abs(L - 30))
 
 
-def check_against_frozen(out: Path, done: dict, seeds, dataset: str):
-    """The frozen arm must reproduce the committed frozen AUROC per patient and seed (tolerance 1e-9)."""
-    ref_file = None
+def frozen_reference(dataset: str) -> Path | None:
+    """The committed frozen development AUROC file for a dataset."""
     d2 = REPO / "results" / "d2"
     if dataset == "seizeit2":
         cand = [REPO / "results" / "seizeit2_dev" / "personalized_seizeit2_dev.csv", d2 / "personalized_seizeit2_dev.csv"]
     else:
         cand = sorted(d2.glob("personalized_*ctx10*.csv")) + sorted(d2.glob("personalized_*frozen*.csv"))
         cand = [c for c in cand if "alarms" not in c.name]
-    for c in cand:
-        if c.exists():
-            ref_file = c
-            break
+    return next((c for c in cand if c.exists()), None)
+
+
+def import_frozen(out: Path, progress: Path, done: dict, seeds, dataset: str) -> int:
+    """Frozen-arm records from the committed results, which --check showed this runner reproduces exactly."""
+    ref_file = frozen_reference(dataset)
+    if ref_file is None:
+        sys.exit("No committed frozen AUROC file found; run the frozen arm instead")
+    n = 0
+    with open(progress, "a") as fh:
+        for r in csv.DictReader(open(ref_file)):
+            seed = int(r["seed"])
+            if seed not in seeds or r.get("general_personal") in (None, ""):
+                continue
+            key = ("frozen", r["subject"], seed, False)
+            if key in done:
+                continue
+            rec = {"arm": "frozen", "subject": r["subject"], "seed": seed, "alarms": False,
+                   "seizures": int(r.get("seizures", 0) or 0), "folds": int(r.get("folds_scored", r.get("folds", 0)) or 0),
+                   "auroc": float(r["general_personal"]), "minutes": 0.0, "imported_from": ref_file.name}
+            done[key] = rec
+            fh.write(json.dumps(rec) + "\n")
+            n += 1
+    return n
+
+
+def check_against_frozen(out: Path, done: dict, seeds, dataset: str):
+    """The frozen arm must reproduce the committed frozen AUROC per patient and seed (tolerance 1e-9)."""
+    ref_file = frozen_reference(dataset)
     if ref_file is None:
         print("CHECK: no committed frozen AUROC file found in results/d2 "
               "(looked for personalized_*ctx10*.csv / personalized_*frozen*.csv / personalized_seizeit2_dev.csv)")
