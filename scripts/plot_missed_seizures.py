@@ -114,6 +114,8 @@ def main():
         s["median_ictal_p"] = float(np.median(p_ictal[ins])) if ins.any() else float("nan")
         s["dataset"] = s["subject"].split(":")[0]
 
+    tested = {W.subjects[c] for c in np.unique(W.subject[np.isfinite(p_ictal)])}
+    seizures = [s for s in seizures if s["subject"] in tested]       # only the D1 test patients have predictions
     scored = [s for s in seizures if s["scored"]]
     with open(out / "missed_seizures.csv", "w", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=list(seizures[0]), lineterminator="\n")
@@ -123,7 +125,8 @@ def main():
              f"Generated {datetime.now().isoformat(timespec='seconds')} · seed {args.seed} · D1 model and folds, "
              "unchanged · docs/evaluation_methods.md v1.25, Section 14.8.", "",
              f"{len(seizures)} annotated seizures in the test patients; {len(scored)} have at least one window entirely "
-             f"inside them; {len(seizures) - len(scored)} are too short (under about 30 s) to be scored this way.", "",
+             f"inside them; {len(seizures) - len(scored)} are shorter than one window (about 30 s) and can't be scored this way. "
+             f"Seizures of the {len({s['subject'] for s in seizures})} test patients only.", "",
              "| Group | Seizures | Median per-seizure AUROC | Detected well (AUROC ≥ 0.9) | Poorly (< 0.7) |",
              "|---|---|---|---|---|"]
 

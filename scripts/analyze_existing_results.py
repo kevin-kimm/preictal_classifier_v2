@@ -52,6 +52,21 @@ def read_csv(p: Path) -> list[dict]:
 
 # ------------------------------------------------------------------ 1. alarm PPV / NPV
 
+def lockbox_alarm_subset(repo: Path, recs: list[dict]) -> set[str] | None:
+    """The patients in the reported lockbox alarm result: the names listed in its report, or else the same
+    random draw as scripts/run_seizeit2.py (20 of the patients scored in the AUROC part, seed 0)."""
+    import re
+    md = repo / "results" / "lockbox" / "seizeit2_lockbox_alarms.md"
+    if md.exists():
+        m = re.search(r"evaluation methods v1\.18\): (.+?)\.\s*$", md.read_text(), re.M)
+        if m:
+            return {s.strip() for s in m.group(1).split(",")}
+    scored = sorted({r["subject"] for r in recs if r.get("part") == "auroc" and int(r.get("seed", 0)) == 0})
+    if not scored:
+        return None
+    return set(np.random.default_rng(0).choice(scored, size=min(20, len(scored)), replace=False).tolist())
+
+
 def alarm_sources(repo: Path) -> list[tuple[str, list[dict]]]:
     """(name, list of {seed, variant, target, seizures, warned, false_alarms, hours, true_alarms}) per source."""
     out = []
@@ -80,19 +95,20 @@ def alarm_sources(repo: Path) -> list[tuple[str, list[dict]]]:
             out.append((name, rows))
     lb = repo / "results" / "lockbox" / "seizeit2_lockbox_progress.jsonl"
     if lb.exists():
+        recs = [json.loads(x) for x in lb.read_text().splitlines() if x.strip()]
+        alarm_recs = [r for r in recs if r.get("part") == "alarms" and "results" in r]
+        subset = lockbox_alarm_subset(repo, recs)
+        if subset is not None:          # only the patients reported in the lockbox alarm result (v1.18)
+            alarm_recs = [r for r in alarm_recs if r["subject"] in subset]
         rows = []
-        for line in lb.read_text().splitlines():
-            rec = json.loads(line)
-            if rec.get("part") != "alarms" or "results" not in rec:
-                continue
+        for rec in alarm_recs:
             for key, v in rec["results"].items():
                 var, tg = key.split("|")
                 rows.append({"seed": int(rec.get("seed", 0)), "variant": var, "target": float(tg),
                              "seizures": int(rec["seizures"]), "warned": int(v["warned"]),
                              "false_alarms": int(v["false_alarms"]), "hours": float(v["hours"]), "true_alarms": None})
         if rows:
-            n = len({json.loads(x)["subject"] for x in lb.read_text().splitlines()
-                     if json.loads(x).get("part") == "alarms"})
+            n = len({r["subject"] for r in alarm_recs})
             out.append((f"Frozen design, SeizeIT2 lockbox ({n} patients, alarm part)", rows))
     return out
 
