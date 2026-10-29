@@ -9,7 +9,10 @@ exactly, and writes one file per recording next to them:
 
 Usage, from the repo root with .venv active:
     python scripts/extract_slow_features.py                        CHB-MIT and Siena
-    python scripts/extract_slow_features.py --dataset seizeit2     SeizeIT2 development patients (never the lockbox)
+    python scripts/extract_slow_features.py --dataset seizeit2     SeizeIT2 development patients
+    python scripts/extract_slow_features.py --dataset seizeit2 --group lockbox --lockbox-run
+                                        lockbox patients: only after the D2.1 freeze (freeze-d2.1 tag), and only
+                                        if D2.1 uses infra-slow features (evaluation methods v1.29)
 
 Resumable: files already made with the same version are skipped.
 """
@@ -93,7 +96,15 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--dataset", choices=["chbmit_siena", "seizeit2"], default="chbmit_siena")
     ap.add_argument("--workers", type=int, default=4)
+    ap.add_argument("--group", choices=["development", "lockbox"], default="development")
+    ap.add_argument("--lockbox-run", action="store_true")
     args = ap.parse_args()
+    if args.group == "lockbox":
+        import subprocess
+        tags = subprocess.run(["git", "tag", "-l", "freeze-d2.1"], cwd=REPO, capture_output=True, text=True).stdout
+        if args.dataset != "seizeit2" or not args.lockbox_run or "freeze-d2.1" not in tags:
+            sys.exit("Refusing to touch the lockbox: only for SeizeIT2, after the D2.1 freeze "
+                     "(needs --dataset seizeit2 --lockbox-run and the freeze-d2.1 Git tag).")
     sz2 = args.dataset == "seizeit2"
     length_s = float(load_config()["windows"]["length_s"])
     feat_dir = REPO / "data" / "processed" / ("features_seizeit2" if sz2 else "features_v2")
@@ -103,7 +114,7 @@ def main():
     if sz2:
         import yaml
         split = yaml.safe_load((REPO / "configs" / "seizeit2_split.yaml").read_text())
-        allowed = {f"seizeit2:{s}" for s in split["development"]}
+        allowed = {f"seizeit2:{s}" for s in split[args.group]}
     jobs = []
     for ds in datasets:
         for f in sorted((feat_dir / ds).glob("*.npz")):

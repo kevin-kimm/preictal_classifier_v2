@@ -16,6 +16,7 @@ so arms can be compared patient by patient:
     slow          plus infra-slow features (scripts/extract_slow_features.py must have been run)
     per_channel   plus each channel's own features, not only their summary across channels (v1.26)
     blend_patient the average of the frozen model's risk and a patient-only model's risk (v1.26)
+    per_channel_slow  per_channel and slow together: the combination step (v1.29)
 
 Each run also saves every scored window (results/d2_plus/<dataset>/scores/), so alarms, warning-window
 lengths, smoothing and PPV/NPV can be re-scored afterwards without retraining (scripts/d2_plus_alarms.py).
@@ -83,6 +84,7 @@ ARMS = {
     "slow": {"slow": True},
     "per_channel": {"per_channel": True},
     "blend_patient": {"blend_patient": True},
+    "per_channel_slow": {"per_channel": True, "slow": True},
 }
 ARM_LABELS = {
     "frozen": "Frozen design",
@@ -95,6 +97,7 @@ ARM_LABELS = {
     "slow": "Plus infra-slow features",
     "per_channel": "Plus per-channel features",
     "blend_patient": "Average of the frozen model and a patient-only model",
+    "per_channel_slow": "Plus per-channel and infra-slow features (combination)",
 }
 PP_LENGTHS = (10, 20, 30, 45, 60)            # minutes; 30 is the frozen length and wins ties
 OTHERS_EVERY = 6                             # other patients' windows 30 s apart, as in the frozen runs
@@ -295,6 +298,8 @@ def main():
         mats["slow"] = np.hstack([Xf, slow])
     if per_ch is not None:
         mats["per_channel"] = np.hstack([Xf, per_ch])
+    if per_ch is not None and slow is not None:
+        mats["per_channel_slow"] = np.hstack([Xf, slow, per_ch])
     scaled_all = {k: scaled_all_for(v) for k, v in mats.items()}
 
     patients = []
@@ -318,7 +323,8 @@ def main():
 
     for arm in args.arm:
         spec = ARMS[arm]
-        mkey = "slow" if spec.get("slow") else ("per_channel" if spec.get("per_channel") else "base")
+        mkey = ("per_channel_slow" if spec.get("slow") and spec.get("per_channel") else
+                "slow" if spec.get("slow") else "per_channel" if spec.get("per_channel") else "base")
         Mall, Sall = mats[mkey], scaled_all[mkey]
         L_arm = spec.get("train_pre_min", 30)
         ytr_all = train_labels[L_arm].copy()

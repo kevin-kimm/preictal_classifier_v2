@@ -13,8 +13,8 @@ scripts/run_d2_plus.py).
              data only, on the same 20 patients as the frozen design's lockbox alarm result (v1.18)
 
 Usage, from the repo root with .venv active:
-    python scripts/run_seizeit2_d21.py --check                 development patients: must reproduce the
-                                                               per_channel challenger (seed 0) exactly
+    python scripts/run_seizeit2_d21.py --check [--design D]    development patients: must reproduce challenger D
+                                                               (default per_channel; v1.29) at seed 0 exactly
     python scripts/run_seizeit2_d21.py --group lockbox --lockbox-run --part auroc     the lockbox run
     python scripts/run_seizeit2_d21.py --group lockbox --lockbox-run --part alarms    then the alarm part
 
@@ -65,7 +65,9 @@ OTHERS_EVERY = 6                     # frozen: other patients' windows 30 s apar
 CONTEXT_S = 600                      # frozen: 10 min context
 TARGETS = (5.0, 1.0)
 SMOOTHING, PERSISTENCE, WARMUP_S = 36, 6, 300.0
-DESIGN = "D2.1: frozen design + per-channel features"
+DESIGNS = {"per_channel": "D2.1: frozen design + per-channel features",
+           "slow": "D2.1: frozen design + infra-slow features",
+           "per_channel_slow": "D2.1: frozen design + per-channel and infra-slow features"}
 
 
 def scale(M, ref):
@@ -76,7 +78,13 @@ def scale(M, ref):
     return ((M - med) / iqr).astype(np.float32)
 
 
-def fit_d21(X, y, w, seed):
+def fit_d21(X, y, w, seed, drop_empty=True):
+    """With per-channel features, columns with fewer than two distinct values in this training data are dropped,
+    as run_d2_plus.py does; the slow-only design is fitted on all columns, also as run_d2_plus.py does."""
+    if not drop_empty:
+        model = build_model(seed)
+        model.fit(X, y, sample_weight=w)
+        return model
     keep = informative_columns(X)
     model = build_model(seed)
     model.fit(X[:, keep], y, sample_weight=w)
@@ -120,7 +128,11 @@ def main():
                     help="development patients: the AUROC part must reproduce run_d2_plus.py's per_channel arm")
     ap.add_argument("--features", type=Path, default=REPO / "data" / "processed" / "features_seizeit2")
     ap.add_argument("--out", type=Path, default=None)
+    ap.add_argument("--design", choices=list(DESIGNS), default="per_channel",
+                    help="which challenger D2.1 is (evaluation methods v1.29); the check compares with that arm")
     args = ap.parse_args()
+    DESIGN = DESIGNS[args.design]
+    use_pc, use_slow = "per_channel" in args.design, "slow" in args.design
     if args.check:
         args.group, args.part = "development", "auroc"
     if args.group == "lockbox":
@@ -150,18 +162,26 @@ def main():
 
     print("Loading features...")
     # only this run's patients and training pool are loaded (development runs never load the lockbox)
-    W = load_windows(args.features, ("seizeit2",), subjects=pool, version=version, keep_per_channel=True)
-    PC = W.per_channel.reshape(len(W.y), -1).astype(np.float32)
-    W.per_channel = None
+    W = load_windows(args.features, ("seizeit2",), subjects=pool, version=version, keep_per_channel=use_pc)
+    extra = []
+    if use_slow:
+        sys.path.insert(0, str(REPO / "scripts"))
+        from run_d2_plus import load_slow
+        extra.append(load_slow(W, args.features, ("seizeit2",)).astype(np.float32))
+    if use_pc:
+        extra.append(W.per_channel.reshape(len(W.y), -1).astype(np.float32))
+        W.per_channel = None
+    EXTRA = np.hstack(extra)
     missing = sorted(pool - set(W.subjects))
     if missing:
         sys.exit(f"No features for {len(missing)} patients (e.g. {missing[0]}); run extract_seizeit2.py first")
     print(f"  {len(W.y):,} windows from {len(W.subjects)} patients")
 
     def patient_matrix(rows):
-        """Frozen features + 10 min context (never crossing patients) + per-channel features."""
+        """Frozen features + 10 min context (never crossing patients) + the design's extra features, in the
+        same column order as run_d2_plus.py (slow, then per-channel)."""
         ctx = context_features(W.X[rows], W.timeline[rows], W.t_end[rows], CONTEXT_S)
-        return np.hstack([W.X[rows], ctx, PC[rows]]).astype(np.float32)
+        return np.hstack([W.X[rows], ctx, EXTRA[rows]]).astype(np.float32)
 
     print("Preparing the other patients' training rows...")
     parts_X, parts_y, parts_s = [], [], []
@@ -188,7 +208,8 @@ def main():
             patients.append((subject, code, rows, events))
     print(f"{len(patients)} patients; part: {args.part}; seeds {args.seeds}")
 
-    progress = args.out / f"d21_seizeit2_{args.group if not args.check else 'check'}_progress.jsonl"
+    tag = "d21" if args.design == "per_channel" else f"d21_{args.design}"
+    progress = args.out / f"{tag}_seizeit2_{args.group if not args.check else 'check'}_progress.jsonl"
     if args.check:
         progress.unlink(missing_ok=True)
     done = {}
@@ -229,7 +250,8 @@ def main():
         def train(rel, P, seed):
             rel = rel[np.isin(y[rel], TRAIN_CLASSES)]
             wg, wp = blend_weights(yo, so, y[rel], 0.5)
-            return fit_d21(np.vstack([Xo, P[rel]]), np.concatenate([yo, y[rel]]), np.concatenate([wg, wp]), seed)
+            return fit_d21(np.vstack([Xo, P[rel]]), np.concatenate([yo, y[rel]]), np.concatenate([wg, wp]), seed,
+                           drop_empty=use_pc)
 
         for seed in args.seeds:
             if (args.part, subject, seed) in done:
@@ -284,7 +306,7 @@ def main():
         f = REPO / "results" / "d2_plus" / "seizeit2" / "progress.jsonl"
         for line in (f.read_text().splitlines() if f.exists() else []):
             r = json.loads(line)
-            if r["arm"] == "per_channel" and not r.get("alarms"):
+            if r["arm"] == args.design and not r.get("alarms"):
                 ref[(r["subject"], r["seed"])] = r["auroc"]
         compared = same = 0
         for (part, s, seed), r in sorted(done.items()):
@@ -293,7 +315,7 @@ def main():
             compared += 1
             ok = abs(r["d21"] - ref[(s, seed)]) <= 1e-9
             same += ok
-            print(f"{s:22s} seed {seed}: new {r['d21']:.6f}  per_channel challenger {ref[(s, seed)]:.6f}  "
+            print(f"{s:22s} seed {seed}: new {r['d21']:.6f}  {args.design} challenger {ref[(s, seed)]:.6f}  "
                   f"{'same' if ok else 'DIFFERENT'}")
         print(f"\nCHECK PASSED: {compared} of {compared} identical" if compared and same == compared else
               f"\nCHECK FAILED: {same} of {compared} identical" + ("" if compared else " (nothing was compared)"))
@@ -301,7 +323,7 @@ def main():
         return
 
     recs = [r for (p, s, seed), r in done.items() if p == args.part and s in names and seed in args.seeds]
-    stem = args.out / f"d21_seizeit2_{args.group}_{args.part}"
+    stem = args.out / f"{tag}_seizeit2_{args.group}_{args.part}"
     lines = [f"# SeizeIT2 {args.group}: {DESIGN}, {args.part}", "",
              f"Generated {datetime.now().isoformat(timespec='seconds')} · seeds {args.seeds} · {len(names)} patients · "
              "docs/evaluation_methods.md v1.28, Section 14.12.", ""]
