@@ -348,3 +348,91 @@
 {"arm": "pure", "subject": "siena:PN03", "seed": 1, "alarms": false, "seizures": 2, "folds": 1, "auroc": 0.8475966992203795, "minutes": 0.55, "auroc_pure_test": 0.8505048368857017}
 {"arm": "pure", "subject": "siena:PN14", "seed": 0, "alarms": false, "seizures": 4, "folds": 4, "auroc": 0.9479886350092466, "minutes": 2.43, "auroc_pure_test": 0.9479248757329318}
 {"arm": "pure", "subject": "siena:PN14", "seed": 1, "alarms": false, "seizures": 4, "folds": 4, "auroc": 0.9355676836952636, "minutes": 2.44, "auroc_pure_test": 0.9361569371727971}
+{"arm": "pp_length", "subject": "chbmit:chb01", "seed": 0, "alarms": false, "seizures": 10, "folds": 10, "auroc": 0.705034690470886, "minutes": 114.59, "chosen_lengths": [45, 45, 45, 45, 45, 45, 10, 10, 20, 60]}
+{"arm": "pp_length", "subject": "chbmit:chb01", "seed": 1, "alarms": false, "seizures": 10, "folds": 10, "auroc": 0.5831392299097865, "minutes": 111.7, "chosen_lengths": [10, 10, 60, 60, 60, 60, 60, 60, 10, 10]}
+{"arm": "pp_length", "subject": "chbmit:chb02", "seed": 0, "alarms": false, "seizures": 2, "folds": 1, "auroc": 0.6506012101827567, "minutes": 0.53, "chosen_lengths": [30]}
+{"arm": "pp_length", "subject": "chbmit:chb02", "seed": 1, "alarms": false, "seizures": 2, "folds": 1, "auroc": 0.5535268813915284, "minutes": 0.53, "chosen_lengths": [30]}
+{"arm": "pp_length", "subject": "chbmit:chb03", "seed": 0, "alarms": false, "seizures": 6, "folds": 6, "auroc": 0.6849679904611601, "minutes": 15.38, "chosen_lengths": [30, 30, 30, 30, 30, 30]}
+{"arm": "pp_length", "subject": "chbmit:chb03", "seed": 1, "alarms": false, "seizures": 6, "folds": 6, "auroc": 0.7013211703041065, "minutes": 14.96, "chosen_lengths": [30, 30, 30, 30, 30, 30]}
+{"arm": "pp_length", "subject": "chbmit:chb04", "seed": 0, "alarms": false, "seizures": 4, "folds": 4, "auroc": 0.3382884974551993, "minutes": 16.25, "chosen_lengths": [30, 10, 60, 60]}
+{"arm": "pp_length", "subject": "chbmit:chb04", "seed": 1, "alarms": false, "seizures": 4, "folds": 4, "auroc": 0.33339047893438006, "minutes": 16.26, "chosen_lengths": [30, 10, 30, 30]}
+{"arm": "pp_length", "subject": "chbmit:chb05", "seed": 0, "alarms": false, "seizures": 5, "folds": 4, "auroc": 0.8024318535149952, "minutes": 12.64, "chosen_lengths": [60, 60, 60, 45]}
+{"arm": "pp_length", "subject": "chbmit:chb05", "seed": 1, "alarms": false, "seizures": 5, "folds": 4, "auroc": 0.8171593141216765, "minutes": 12.64, "chosen_lengths": [60, 60, 60, 45]}
+{"arm": "pp_length", "subject": "chbmit:chb06", "seed": 0, "alarms": false, "seizures": 10, "folds": 10, "auroc": 0.6362558040873362, "minutes": 96.52, "chosen_lengths": [45, 20, 10, 60, 20, 10, 30, 45, 60, 60]}
+{"arm": "pp_length", "subject": "chbmit:chb06", "seed": 1, "alarms": false, "seizures": 10, "folds": 10, "auroc": 0.6426584057501817, "minutes": 96.38, "chosen_lengths": [30, 20, 60, 60, 60, 10, 20, 45, 45, 45]}
+{"arm": "pp_length", "subject": "chbmit:chb07", "seed": 0, "alarms": false, "seizures": 3, "folds": 2, "auroc": 0.6453004664280291, "minutes": 3.02, "chosen_lengths": [30, 30]}
+{"arm": "pp_length", "subject": "chbmit:chb07", "seed": 1, "alarms": false, "seizures": 3, "folds": 2, "auroc": 0.6248017002928735, "minutes": 3.03, "chosen_lengths": [30, 45]}
+{"arm": "pp_length", "subject": "chbmit:chb09", "seed": 0, "alarms": false, "seizures": 4, "folds": 4, "auroc": 0.44445036878097266, "minutes": 12.92, "chosen_lengths": [10, 30, 60, 45]}
+{"arm": "pp_length", "subject": "chbmit:chb09", "seed": 1, "alarms": false, "seizures": 4, "folds": 4, "auroc": 0.535905329182069, "minutes": 12.68, "chosen_lengths": [60, 30, 60, 30]}
+{"arm": "pp_length", "subject": "chbmit:chb10", "seed": 0, "alarms": false, "seizures": 6, "folds": 6, "auroc": 0.6975759194172697, "minutes": 30.37, "chosen_lengths": [20, 10, 30, 20, 10, 45]}
+{"arm": "pp_length", "subject": "chbmit:chb10", "seed": 1, "alarms": false, "seizures": 6, "folds": 6, "auroc": 0.727342636506774, "minutes": 30.44, "chosen_lengths": [20, 10, 20, 10, 30, 20]}
+{"arm": "pp_length", "subject": "chbmit:chb13", "seed": 0, "alarms": false, "seizures": 5, "folds": 5, "auroc": 0.8175966813655465, "minutes": 15.64, "chosen_lengths": [20, 30, 20, 10, 30]}
+{"arm": "pp_length", "subject": "chbmit:chb13", "seed": 1, "alarms": false, "seizures": 5, "folds": 5, "auroc": 0.8062784402625096, "minutes": 15.58, "chosen_lengths": [20, 30, 20, 10, 30]}
+{"arm": "pp_length", "subject": "chbmit:chb14", "seed": 0, "alarms": false, "seizures": 6, "folds": 6, "auroc": 0.6824219383852199, "minutes": 25.48, "chosen_lengths": [45, 60, 45, 10, 60, 20]}
+{"arm": "pp_length", "subject": "chbmit:chb14", "seed": 1, "alarms": false, "seizures": 6, "folds": 6, "auroc": 0.7060788547320455, "minutes": 25.72, "chosen_lengths": [45, 60, 45, 10, 60, 20]}
+{"arm": "pp_length", "subject": "chbmit:chb15", "seed": 0, "alarms": false, "seizures": 9, "folds": 9, "auroc": 0.5300699946028932, "minutes": 63.41, "chosen_lengths": [10, 60, 60, 60, 60, 20, 45, 30, 45]}
+{"arm": "pp_length", "subject": "chbmit:chb15", "seed": 1, "alarms": false, "seizures": 9, "folds": 9, "auroc": 0.5475166317579188, "minutes": 61.72, "chosen_lengths": [10, 60, 60, 60, 60, 20, 45, 30, 45]}
+{"arm": "pp_length", "subject": "chbmit:chb16", "seed": 0, "alarms": false, "seizures": 5, "folds": 5, "auroc": 0.7783506945583014, "minutes": 8.44, "chosen_lengths": [30, 30, 30, 30, 30]}
+{"arm": "pp_length", "subject": "chbmit:chb16", "seed": 1, "alarms": false, "seizures": 5, "folds": 5, "auroc": 0.6731812016256989, "minutes": 8.51, "chosen_lengths": [30, 30, 30, 30, 30]}
+{"arm": "pp_length", "subject": "chbmit:chb17", "seed": 0, "alarms": false, "seizures": 3, "folds": 2, "auroc": 0.8330341072211971, "minutes": 1.03, "chosen_lengths": [30, 30]}
+{"arm": "pp_length", "subject": "chbmit:chb17", "seed": 1, "alarms": false, "seizures": 3, "folds": 2, "auroc": 0.8453423910542857, "minutes": 0.98, "chosen_lengths": [30, 30]}
+{"arm": "pp_length", "subject": "chbmit:chb18", "seed": 0, "alarms": false, "seizures": 4, "folds": 3, "auroc": 0.5231903988080354, "minutes": 5.57, "chosen_lengths": [30, 30, 20]}
+{"arm": "pp_length", "subject": "chbmit:chb18", "seed": 1, "alarms": false, "seizures": 4, "folds": 3, "auroc": 0.46220926597156786, "minutes": 5.53, "chosen_lengths": [30, 30, 20]}
+{"arm": "pp_length", "subject": "chbmit:chb19", "seed": 0, "alarms": false, "seizures": 2, "folds": 2, "auroc": 0.9232207800452926, "minutes": 1.02, "chosen_lengths": [30, 30]}
+{"arm": "pp_length", "subject": "chbmit:chb19", "seed": 1, "alarms": false, "seizures": 2, "folds": 2, "auroc": 0.9119726657331113, "minutes": 1.03, "chosen_lengths": [30, 30]}
+{"arm": "pp_length", "subject": "chbmit:chb20", "seed": 0, "alarms": false, "seizures": 5, "folds": 2, "auroc": 0.7443327579945377, "minutes": 3.96, "chosen_lengths": [20, 20]}
+{"arm": "pp_length", "subject": "chbmit:chb20", "seed": 1, "alarms": false, "seizures": 5, "folds": 2, "auroc": 0.7564476533326931, "minutes": 3.97, "chosen_lengths": [20, 20]}
+{"arm": "pp_length", "subject": "chbmit:chb22", "seed": 0, "alarms": false, "seizures": 2, "folds": 1, "auroc": 0.5079754158519982, "minutes": 0.5, "chosen_lengths": [30]}
+{"arm": "pp_length", "subject": "chbmit:chb22", "seed": 1, "alarms": false, "seizures": 2, "folds": 1, "auroc": 0.44922474619109665, "minutes": 0.5, "chosen_lengths": [30]}
+{"arm": "pp_length", "subject": "chbmit:chb23", "seed": 0, "alarms": false, "seizures": 5, "folds": 4, "auroc": 0.9080452033586764, "minutes": 5.71, "chosen_lengths": [30, 30, 30, 30]}
+{"arm": "pp_length", "subject": "chbmit:chb23", "seed": 1, "alarms": false, "seizures": 5, "folds": 4, "auroc": 0.9175802134561502, "minutes": 5.67, "chosen_lengths": [30, 30, 30, 30]}
+{"arm": "pp_length", "subject": "siena:PN01", "seed": 0, "alarms": false, "seizures": 2, "folds": 2, "auroc": 0.9469412899078639, "minutes": 0.98, "chosen_lengths": [30, 30]}
+{"arm": "pp_length", "subject": "siena:PN01", "seed": 1, "alarms": false, "seizures": 2, "folds": 2, "auroc": 0.9997608589182405, "minutes": 0.93, "chosen_lengths": [30, 30]}
+{"arm": "pp_length", "subject": "siena:PN03", "seed": 0, "alarms": false, "seizures": 2, "folds": 1, "auroc": 0.8670199717837384, "minutes": 0.48, "chosen_lengths": [30]}
+{"arm": "pp_length", "subject": "siena:PN03", "seed": 1, "alarms": false, "seizures": 2, "folds": 1, "auroc": 0.8432254200375303, "minutes": 0.52, "chosen_lengths": [30]}
+{"arm": "pp_length", "subject": "siena:PN14", "seed": 0, "alarms": false, "seizures": 4, "folds": 4, "auroc": 0.9499171797277638, "minutes": 10.83, "chosen_lengths": [10, 45, 45, 60]}
+{"arm": "pp_length", "subject": "siena:PN14", "seed": 1, "alarms": false, "seizures": 4, "folds": 4, "auroc": 0.9668603569470988, "minutes": 10.75, "chosen_lengths": [10, 45, 45, 60]}
+{"arm": "slow", "subject": "chbmit:chb01", "seed": 0, "alarms": false, "seizures": 10, "folds": 10, "auroc": 0.5861514422357522, "minutes": 6.45}
+{"arm": "slow", "subject": "chbmit:chb01", "seed": 1, "alarms": false, "seizures": 10, "folds": 10, "auroc": 0.6295631103876886, "minutes": 6.34}
+{"arm": "slow", "subject": "chbmit:chb02", "seed": 0, "alarms": false, "seizures": 2, "folds": 1, "auroc": 0.7417334140929819, "minutes": 0.53}
+{"arm": "slow", "subject": "chbmit:chb02", "seed": 1, "alarms": false, "seizures": 2, "folds": 1, "auroc": 0.6244719626181708, "minutes": 0.54}
+{"arm": "slow", "subject": "chbmit:chb03", "seed": 0, "alarms": false, "seizures": 6, "folds": 6, "auroc": 0.6743875621891384, "minutes": 3.37}
+{"arm": "slow", "subject": "chbmit:chb03", "seed": 1, "alarms": false, "seizures": 6, "folds": 6, "auroc": 0.7568344601677521, "minutes": 3.23}
+{"arm": "slow", "subject": "chbmit:chb04", "seed": 0, "alarms": false, "seizures": 4, "folds": 4, "auroc": 0.39940192724990686, "minutes": 2.92}
+{"arm": "slow", "subject": "chbmit:chb04", "seed": 1, "alarms": false, "seizures": 4, "folds": 4, "auroc": 0.4454410330355417, "minutes": 2.98}
+{"arm": "slow", "subject": "chbmit:chb05", "seed": 0, "alarms": false, "seizures": 5, "folds": 4, "auroc": 0.7485484623085978, "minutes": 2.12}
+{"arm": "slow", "subject": "chbmit:chb05", "seed": 1, "alarms": false, "seizures": 5, "folds": 4, "auroc": 0.7304467044513033, "minutes": 2.11}
+{"arm": "slow", "subject": "chbmit:chb06", "seed": 0, "alarms": false, "seizures": 10, "folds": 10, "auroc": 0.6968483784853443, "minutes": 5.67}
+{"arm": "slow", "subject": "chbmit:chb06", "seed": 1, "alarms": false, "seizures": 10, "folds": 10, "auroc": 0.6899407771537576, "minutes": 5.7}
+{"arm": "slow", "subject": "chbmit:chb07", "seed": 0, "alarms": false, "seizures": 3, "folds": 2, "auroc": 0.6160262320569838, "minutes": 1.19}
+{"arm": "slow", "subject": "chbmit:chb07", "seed": 1, "alarms": false, "seizures": 3, "folds": 2, "auroc": 0.6526340528618433, "minutes": 1.18}
+{"arm": "slow", "subject": "chbmit:chb09", "seed": 0, "alarms": false, "seizures": 4, "folds": 4, "auroc": 0.49513338693561315, "minutes": 2.29}
+{"arm": "slow", "subject": "chbmit:chb09", "seed": 1, "alarms": false, "seizures": 4, "folds": 4, "auroc": 0.4784083864987682, "minutes": 2.31}
+{"arm": "slow", "subject": "chbmit:chb10", "seed": 0, "alarms": false, "seizures": 6, "folds": 6, "auroc": 0.734361671394474, "minutes": 3.26}
+{"arm": "slow", "subject": "chbmit:chb10", "seed": 1, "alarms": false, "seizures": 6, "folds": 6, "auroc": 0.6785017221584386, "minutes": 3.2}
+{"arm": "slow", "subject": "chbmit:chb13", "seed": 0, "alarms": false, "seizures": 5, "folds": 5, "auroc": 0.8610141709624661, "minutes": 2.58}
+{"arm": "slow", "subject": "chbmit:chb13", "seed": 1, "alarms": false, "seizures": 5, "folds": 5, "auroc": 0.8666669772063847, "minutes": 2.64}
+{"arm": "slow", "subject": "chbmit:chb14", "seed": 0, "alarms": false, "seizures": 6, "folds": 6, "auroc": 0.6854369706342399, "minutes": 3.1}
+{"arm": "slow", "subject": "chbmit:chb14", "seed": 1, "alarms": false, "seizures": 6, "folds": 6, "auroc": 0.6721682622839349, "minutes": 3.01}
+{"arm": "slow", "subject": "chbmit:chb15", "seed": 0, "alarms": false, "seizures": 9, "folds": 9, "auroc": 0.5147005444646098, "minutes": 4.46}
+{"arm": "slow", "subject": "chbmit:chb15", "seed": 1, "alarms": false, "seizures": 9, "folds": 9, "auroc": 0.5541103302861585, "minutes": 4.56}
+{"arm": "slow", "subject": "chbmit:chb16", "seed": 0, "alarms": false, "seizures": 5, "folds": 5, "auroc": 0.7960573161122484, "minutes": 2.45}
+{"arm": "slow", "subject": "chbmit:chb16", "seed": 1, "alarms": false, "seizures": 5, "folds": 5, "auroc": 0.6962332841843201, "minutes": 2.55}
+{"arm": "slow", "subject": "chbmit:chb17", "seed": 0, "alarms": false, "seizures": 3, "folds": 2, "auroc": 0.8279436947720544, "minutes": 1.04}
+{"arm": "slow", "subject": "chbmit:chb17", "seed": 1, "alarms": false, "seizures": 3, "folds": 2, "auroc": 0.8456883878553528, "minutes": 1.02}
+{"arm": "slow", "subject": "chbmit:chb18", "seed": 0, "alarms": false, "seizures": 4, "folds": 3, "auroc": 0.5533766033343817, "minutes": 1.6}
+{"arm": "slow", "subject": "chbmit:chb18", "seed": 1, "alarms": false, "seizures": 4, "folds": 3, "auroc": 0.582393288206453, "minutes": 1.59}
+{"arm": "slow", "subject": "chbmit:chb19", "seed": 0, "alarms": false, "seizures": 2, "folds": 2, "auroc": 0.8987785143774002, "minutes": 1.03}
+{"arm": "slow", "subject": "chbmit:chb19", "seed": 1, "alarms": false, "seizures": 2, "folds": 2, "auroc": 0.929232688285613, "minutes": 1.08}
+{"arm": "slow", "subject": "chbmit:chb20", "seed": 0, "alarms": false, "seizures": 5, "folds": 2, "auroc": 0.7520960890642008, "minutes": 1.02}
+{"arm": "slow", "subject": "chbmit:chb20", "seed": 1, "alarms": false, "seizures": 5, "folds": 2, "auroc": 0.7348292142018085, "minutes": 1.0}
+{"arm": "slow", "subject": "chbmit:chb22", "seed": 0, "alarms": false, "seizures": 2, "folds": 1, "auroc": 0.5238065877734193, "minutes": 0.51}
+{"arm": "slow", "subject": "chbmit:chb22", "seed": 1, "alarms": false, "seizures": 2, "folds": 1, "auroc": 0.5284628148091313, "minutes": 0.53}
+{"arm": "slow", "subject": "chbmit:chb23", "seed": 0, "alarms": false, "seizures": 5, "folds": 4, "auroc": 0.8846319172347175, "minutes": 2.08}
+{"arm": "slow", "subject": "chbmit:chb23", "seed": 1, "alarms": false, "seizures": 5, "folds": 4, "auroc": 0.9083280874124771, "minutes": 2.04}
+{"arm": "slow", "subject": "siena:PN01", "seed": 0, "alarms": false, "seizures": 2, "folds": 2, "auroc": 0.9545124965563685, "minutes": 0.98}
+{"arm": "slow", "subject": "siena:PN01", "seed": 1, "alarms": false, "seizures": 2, "folds": 2, "auroc": 0.9899369432795617, "minutes": 0.96}
+{"arm": "slow", "subject": "siena:PN03", "seed": 0, "alarms": false, "seizures": 2, "folds": 1, "auroc": 0.8773956116615593, "minutes": 0.5}
+{"arm": "slow", "subject": "siena:PN03", "seed": 1, "alarms": false, "seizures": 2, "folds": 1, "auroc": 0.8413588632806324, "minutes": 0.5}
+{"arm": "slow", "subject": "siena:PN14", "seed": 0, "alarms": false, "seizures": 4, "folds": 4, "auroc": 0.9502429779124211, "minutes": 2.0}
+{"arm": "slow", "subject": "siena:PN14", "seed": 1, "alarms": false, "seizures": 4, "folds": 4, "auroc": 0.9466901227986682, "minutes": 2.0}
