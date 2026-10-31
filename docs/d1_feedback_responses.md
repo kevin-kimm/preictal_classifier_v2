@@ -8,11 +8,11 @@ The D1 report came back with comments from the course instructor. Each one is an
 |---|---|---|---|
 | 1 | How does this compare with patients' ability to predict their own seizures (prodrome or aura)? The device would need to do better, or give more precise timing. | Literature (below), plus warning windows of 10–60 min scored with chance recomputed for each (Section 14.4) | Literature done; timing pending |
 | 2 | Some patients may have a longer or shorter "true" preictal period. Change the amount of interictal time and see if accuracy changes. Try unsupervised learning. | Training preictal length 10–60 min, and chosen per patient (Section 14.2); interictal gap 1, 2, 4 and 8 h (Section 14.9); isolation-forest anomaly score with no seizure labels (Section 14.6) | Preictal length done (below); interictal gap and unsupervised pending |
-| 3 | Is 30 s sufficient? Infra-slow oscillations. | Check whether the amplifiers recorded below 0.5 Hz, then 5-minute infra-slow features as a challenger (Section 14.7) | Check done (below); challenger pending |
+| 3 | Is 30 s sufficient? Infra-slow oscillations. | Check whether the amplifiers recorded below 0.5 Hz, then 5-minute infra-slow features as a challenger (Section 14.7) | Done (below) |
 | 4 | If a window contains two states (e.g. a seizure starts at 22 s), how is it classified? Could edge cases hurt accuracy? | By design (below), plus a challenger trained without such windows and AUROC on test windows without them (Section 14.2) | Done |
 | 5 | Did you only use 25 people out of the datasets? | Below | Done |
 | 6 | Seizure detection (0.865): surprised it isn't higher. Can you see the difference in the missed seizures? | Per-seizure detection scores and EEG of the best and worst detected seizures (Section 14.8) | Done |
-| 7 | PPV would be useful, and a confusion matrix. | PPV, NPV and confusion matrices for every alarm result, at hospital and home seizure rates (Sections 14.1, 14.5) | Existing results done (below); new runs pending |
+| 7 | PPV would be useful, and a confusion matrix. | PPV, NPV and confusion matrices for every alarm result, at hospital and home seizure rates (Sections 14.1, 14.5) | Done for existing results and D2.1 (below); per-threshold confusion matrices pending |
 | 8 | Surprised changing the seed has such a large effect with a larger dataset. | Seed variability per patient and overall (Section 14.1), and the explanation below | Done |
 | 9 | Fewer channels scoring higher: does that make sense? | Seed-by-seed and patient-by-patient test (Section 14.1) | Done |
 
@@ -55,9 +55,9 @@ Before testing infra-slow features, `scripts/check_infraslow.py` looked at the m
 
 The spectra (`results/d2_plus/infraslow_check.png`) make this plain. CHB-MIT's power falls by almost three orders of magnitude from 0.5 Hz down to 0.01 Hz. Siena's stays flat across the infra-slow range. SeizeIT2's rises to about ten times Siena's, which is more than brain activity alone would give and points to electrode drift and movement in a wearable.
 
-**As a challenger,** the 5-minute infra-slow features raised development AUROC slightly (+0.012 pooled, higher in 19 of 36 patients), and combined with per-channel features they gave the best development design (0.720 against 0.690). On 62 new SeizeIT2 patients the combination scored 0.624 against 0.621, a difference not distinguishable from zero (−0.013 to +0.017). So a longer look-back doesn't measurably improve prediction on new patients.
+So for most of the development data (CHB-MIT), a longer window can't add infra-slow information; the 10 min context features already give the frozen design a longer look at the 0.5–45 Hz features. SeizeIT2 is where infra-slow features have a chance.
 
-So for most of the development data (CHB-MIT), a longer window can't add infra-slow information; the 10 min context features already give the frozen design a longer look at the 0.5–45 Hz features. The `slow` challenger still runs on both development sets as planned, and SeizeIT2 is where it has a chance.
+**As a challenger,** the 5-minute infra-slow features raised development AUROC slightly (+0.012 pooled, higher in 19 of 36 patients), and combined with per-channel features they gave the best development design (0.720 against 0.690). On 62 new SeizeIT2 patients the combination scored 0.624 against 0.621, a difference not distinguishable from zero (−0.013 to +0.017), and its alarms were similar (42% of seizures warned at 6.26 false alarms per 24 h, against 38% at 5.83). So a longer look-back doesn't measurably improve prediction on new patients.
 
 ## 4. Windows that contain two states
 
@@ -103,7 +103,7 @@ Most seizures are detected almost perfectly, by a model that has never seen the 
 * **Missed (chb15):** within the first 40 s there is no obvious change on these 8 channels; the seizure may start elsewhere (central or midline channels) or build up later.
 * **Detected (chb09, chb11, chb19):** large, fast, widespread activity on every channel, many times the background amplitude.
 
-So the model detects seizures that change the whole head strongly and misses ones that stay focal and moderate. That fits how the features are built: each feature is summarized across the 18 channels by mean, SD, minimum and maximum, so a change on 3 channels moves the summary much less than a change on all 18. Seen from other patients, a frontal rhythm can also look like eye-movement artifact, which is common in normal EEG; that would explain why these seizures score *below* normal EEG. A personalized model (which learns the patient's own seizures) or per-channel features would be expected to catch them; per-channel features are already on the v3 list.
+So the model detects seizures that change the whole head strongly and misses ones that stay focal and moderate. That fits how the features are built: each feature is summarized across the 18 channels by mean, SD, minimum and maximum, so a change on 3 channels moves the summary much less than a change on all 18. Seen from other patients, a frontal rhythm can also look like eye-movement artifact, which is common in normal EEG; that would explain why these seizures score *below* normal EEG. A personalized model (which learns the patient's own seizures) or per-channel features would be expected to catch them. Per-channel features were then tested: they raised development AUROC by 0.023 (higher in 25 of 36 patients), but combined with infra-slow features they didn't measurably help on new patients (Section 3 above).
 
 ## 7. PPV, NPV and confusion matrices
 
@@ -123,7 +123,7 @@ From the alarm results already committed (`results/d2_plus/existing_results.md`)
 * **NPV is high for every model,** including the near-chance ones, because almost every 30 minutes is seizure-free. A device that never alarmed would score about the same, so NPV says little here.
 * **D1's window-level confusion matrix** (most likely class, preictal vs interictal): sensitivity 0.30, specificity 0.73, PPV 0.09 with 8.6% of windows preictal. A PPV barely above the share of preictal windows matches D1's near-chance AUROC.
 
-Both depend on how often seizures happen, which is why the evaluation methods (Section 8) don't use them as pass/fail criteria. The new runs add confusion matrices at each alarm threshold and time-based PPV/NPV.
+Both depend on how often seizures happen, which is why the evaluation methods (Section 8) don't use them as pass/fail criteria. D2.1's lockbox alarm PPV and NPV are in `results/lockbox/d21_per_channel_slow_seizeit2_lockbox_alarms.md`; confusion matrices at each alarm threshold and time-based PPV/NPV come from `scripts/d2_plus_alarms.py`.
 
 ## 8. Why seeds mattered so much in v1
 

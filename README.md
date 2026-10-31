@@ -3,7 +3,7 @@
 Cross patient seizure forecasting from scalp EEG. The software watches a continuous EEG signal and warns the user when a seizure is likely to begin within the next 30 minutes, at least 5 seconds before onset.
 
 
-**Status:** Deliverable 2 in progress · **Predecessor:** [preictal_classifier (AuraSense v1)](https://github.com/kevin-kimm/preictal_classifier)
+**Status:** Deliverable 2 results complete (report in progress) · **Predecessor:** [preictal_classifier (AuraSense v1)](https://github.com/kevin-kimm/preictal_classifier)
 
 ## Overview
 
@@ -21,6 +21,7 @@ preictal_classifier_v2 is a ground up rebuild of the AuraSense seizure predictio
 * **Prediction across patients doesn't work.** A model trained on other people and tested on someone new is at or near chance from brain waves alone (AUROC 0.556 in D1; 0.614 in D2, almost all of it from the time of day).
 * **Personalization works.** A model that also learns the person's own earlier seizures does clearly better, and the gain held on every dataset.
 * **The final test was on new patients with wearable EEG.** On 62 sealed SeizeIT2 patients with behind the ear sensors, the frozen design reached AUROC 0.621 against 0.547 without personal data. Its alarms warned 38% of seizures at 5.83 false alarms per 24 h, more than 3 times chance.
+* **The improvement round after the D1 feedback didn't change the final design.** Ten pre-registered challengers were tested; the best (per-channel + infra-slow features) scored 0.720 against 0.690 on development patients, but 0.624 against 0.621 on the same new patients, not a confirmed gain. About 1 alarm in 10 was followed by a seizure (PPV 0.10).
 * **A device that keeps learning its wearer predicts better over time,** but its alarm thresholds need to keep adapting too: false alarms rose to 13.8 per 24 h.
 * **It isn't a usable warning device yet.** The course target (80% of seizures at ≤ 5 false alarms per 24 h) was not met. The evidence points to a continuously personalizing device as the way forward; see the [D2 final analysis](docs/final_analysis.md).
 
@@ -166,7 +167,9 @@ preictal_classifier_v2/
 │   ├── audit_data.py
 │   ├── build_dataset.py
 │   ├── run_lopo.py
-│   └── run_d2_plus.py ...    # D2 improvement round (see Section 14 of the evaluation methods)
+│   ├── run_d2_plus.py ...    # D2 improvement round (see Section 14 of the evaluation methods)
+│   ├── run_seizeit2_d21.py   # D2.1 lockbox runner (refuses without tag freeze-d2.1)
+│   └── explain_seizeit2.py   # What the model relies on (SeizeIT2 development patients only)
 ├── src/preictal/             # Installable Python package
 │   ├── data/                 # loaders.py, harmonize.py, labels.py
 │   ├── features/             # build_features.py, slow.py
@@ -207,7 +210,8 @@ pip install -e .
 | 7. Personalized designs and the frozen design | `scripts/run_personalized.py`, `scripts/run_personalized_alarms.py` | Done (frozen, tag `freeze-v1.13`) |
 | 8. SeizeIT2 adapter and lockbox | `src/preictal/data/seizeit2.py`, `scripts/extract_seizeit2.py`, `scripts/run_seizeit2.py` | Done (final test reported) |
 | 9. Continuous-personalization simulation | `src/preictal/evaluation/learning_curve.py`, `scripts/run_learning_curve.py` | Done |
-| 10. Replay and live interface | `scripts/cyton_check.py` (connection check); interface to come | D3 |
+| 10. Improvement round and model explanation | `scripts/run_d2_plus.py`, `scripts/d2_plus_alarms.py`, `scripts/run_seizeit2_d21.py`, `scripts/plot_seizeit2_leadup.py`, `scripts/explain_seizeit2.py` | Done (D2.1 not confirmed) |
+| 11. Replay and live interface | `scripts/cyton_check.py` (connection check); interface to come | D3 |
 
 Tunable parameters, including the preictal window, sampling rate, alarm refractory period and random seeds, are read from `configs/default.yaml`. Parameters fixed by the verification plan are marked there.
 
@@ -240,7 +244,7 @@ Long verification runs have their own scripts and write their evidence to `resul
 |---|---|---|
 | 1. Rebuild and first evaluation | [`docs/verification_results/D1.md`](docs/verification_results/D1.md) | VT-01 to VT-14 complete (VT-13 failed) |
 | 2. Final prototype with alarm logic | [`docs/verification_results/D2.md`](docs/verification_results/D2.md) | VT-15 and VT-17 failed, VT-16 passed; patient-specific test reported |
-| 2. Improvement round after the D1 feedback | [`docs/d1_feedback_responses.md`](docs/d1_feedback_responses.md), `results/d2_plus/` | Planned (evaluation methods v1.25, Section 14) |
+| 2. Improvement round after the D1 feedback | [`docs/d1_feedback_responses.md`](docs/d1_feedback_responses.md), `results/d2_plus/`, `results/lockbox/d21_*` | Done: D2.1 not confirmed on the lockbox; frozen design stays final (evaluation methods v1.25–v1.31, Section 14; F2-19 to F2-21) |
 | 3. Interface and live Cyton test | `docs/verification_results/D3.md` | Not started |
 
 ### Current model metrics
@@ -254,6 +258,9 @@ Long verification runs have their own scripts and write their evidence to `resul
 | Frozen design alarms, target ≤ 5 / ≤ 1 false alarms per 24 h | – | 16% warned at 3.43 per 24 h (chance 7%) / 9% at 1.41 (chance 3%) | – |
 | **Final test: SeizeIT2 lockbox, frozen design AUROC (62 new patients)** | – | **0.621 (95% CI 0.564–0.671); other patients only 0.547** | – |
 | **Final test: SeizeIT2 lockbox alarms, ≤ 5 / ≤ 1 per 24 h (20 random patients)** | – | **38% warned at 5.83 per 24 h (chance 11%) / 18% at 1.69 (chance 3.5%)** | – |
+| Improvement round: D2.1 (per-channel + infra-slow), development / same lockbox patients | – | 0.720 vs 0.690 (optimistic) / 0.624 vs 0.621, not confirmed | – |
+| D2.1 lockbox alarms, ≤ 5 / ≤ 1 per 24 h (same 20 patients) | – | 42% warned at 6.26 per 24 h (chance 12%) / 23% at 1.94 (chance 4%) | – |
+| Alarm PPV / NPV, frozen design on the lockbox (≤ 5 setting) | 0.06 / 0.94 (cross-patient) | 0.10 / 0.98 | – |
 | Event sensitivity | 0.21 (chance at this rate: 0.20) | 0.16 (chance: 0.11) | Not applicable |
 | False alarms per 24 h, test patients | 10.61 | 5.84 | – |
 | False alarms per 24 h, TUSZ (unseen patients) | 69.67 | 55.2 (held-out half) | – |
@@ -276,6 +283,14 @@ A planned sensitivity analysis with a 1-hour gap for normal EEG lowered the froz
 **Final test (SeizeIT2 lockbox).** On 62 patients the design never saw, the frozen design reached AUROC 0.621 (95% CI 0.564–0.671), against 0.547 for a model trained only on other people. Its alarms warned 38% of seizures at 5.8 false alarms per 24 h, more than 3 times chance. The signal is real but modest, and personal: learning the wearer's own seizures is what makes it work (F2-17).
 
 **A device that keeps learning.** Simulated forward in time on the SeizeIT2 development patients, a device that retrains after each of the wearer's seizures predicted better than one that never learns (AUROC 0.606 against 0.454 on the same periods; better in 26 of 31, p = 0.0015). It warned 38% of seizures against 16%, but at 13.8 false alarms per 24 h, so alarm thresholds would need to keep adapting too (F2-18).
+
+**Improvement round after the D1 feedback.** Each of the instructor's comments got an answer or a pre-registered experiment ([responses](docs/d1_feedback_responses.md); evaluation methods Section 14). Ten challengers to the frozen design were scored on the same 36 development patients and seeds, under an adoption rule fixed in advance:
+
+* **No gain:** a different training preictal length (10–60 min, or chosen per patient from earlier seizures), dropping windows that straddle two states, and averaging in a patient-only model.
+* **Development gain:** infra-slow features (+0.012) and per-channel features (+0.023), and both together (D2.1, 0.720 against 0.690).
+* **On the lockbox,** D2.1 scored 0.624 against 0.621 on the same 62 patients (+0.003, 95% interval −0.013 to +0.017), so it wasn't confirmed. Its alarms were similar (42% at 6.26 against 38% at 5.83 per 24 h). Picking the best of ten versions on the same patients inflated the winner, which is the same effect as v1's best of 297 seeds (F2-19).
+* **PPV:** on the lockbox, about 1 alarm in 10 was followed by a seizure; at one seizure a day at home it would be about 1 in 16 (F2-20).
+* **What the model relies on:** on SeizeIT2 development seizures, mostly the change over the last 10 minutes. Large wearable artifacts (hundreds of µV) can imitate that change, which points to artifact rejection as a v3 hypothesis (F2-21; `scripts/explain_seizeit2.py`).
 
 ## Comparison with v1
 
@@ -309,7 +324,7 @@ A planned sensitivity analysis with a 1-hour gap for normal EEG lowered the froz
 | 2 | Continuous-personalization simulation (added) | – | Done (F2-18) |
 | 2 | Final analysis of results | 10% | Done ([final_analysis.md](docs/final_analysis.md)) |
 | 2 | README | 15% | Checked by `scripts/check_readme.py` (VT-20) |
-| 2 | Improvement round after the D1 feedback (added): preictal length, infra-slow features, unsupervised test, PPV/NPV | – | Planned before any result ([evaluation methods](docs/evaluation_methods.md) v1.25, Section 14; [responses](docs/d1_feedback_responses.md)) |
+| 2 | Improvement round after the D1 feedback (added): preictal length, infra-slow and per-channel features, PPV/NPV, model explanation | – | Done: D2.1 not confirmed on new patients ([evaluation methods](docs/evaluation_methods.md) v1.25–v1.31, Section 14; [responses](docs/d1_feedback_responses.md)); unsupervised test and interictal-gap runs still to run |
 | 3 (20%) | Local interface showing dataset replay and alarms | 10% | Not started |
 | 3 | Real-time Cyton acquisition, live baseline, seizure-free recording | – | Not started |
 | 3 | Analysis report compared with D1 and D2 | 10% | Not started |

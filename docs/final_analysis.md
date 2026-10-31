@@ -1,6 +1,6 @@
 # Final Analysis (Deliverable 2)
 
-Kevin Kim · 2026-10-03 · preictal_classifier_v2
+Kevin Kim · 2026-10-03, updated 2026-10-31 after the improvement round · preictal_classifier_v2
 
 ## 1. The question and the short answer
 
@@ -10,7 +10,8 @@ Not yet. Every test points the same way:
 
 * **Across people,** a model trained on other people barely beats guessing.
 * **Personalized,** a model that also learns the wearer's own seizures finds a real, statistically solid signal. On 62 new patients with behind-the-ear EEG it reached AUROC 0.621 and warned 38% of seizures at 5.8 false alarms per 24 h, more than 3 times chance.
-* **Compared with the course target** of 80% of seizures warned at no more than 5 false alarms per 24 h, that is well short of a device someone could rely on.
+* **An improvement round after the D1 feedback** tested ten changes (preictal length, infra-slow and per-channel features, and more). The best one looked better on development patients (0.720 against 0.690), but on the same new patients it scored 0.624 against 0.621, not a real gain. The frozen design stays the final design.
+* **Compared with the course target** of 80% of seizures warned at no more than 5 false alarms per 24 h, that is well short of a device someone could rely on. About 1 alarm in 10 was followed by a seizure (PPV 0.10).
 
 The results support one direction clearly: a device that keeps learning its wearer, with alarm thresholds that adapt over time.
 
@@ -18,9 +19,10 @@ The results support one direction clearly: a device that keeps learning its wear
 
 The project was run as a design-controlled software-as-a-medical-device prototype:
 
-* **Rules fixed before testing.** A verification plan with pass/fail criteria was frozen before any test (tag `vtp-1.0`). Every later choice was written into the evaluation methods before it was run (versions 1.0 to 1.19), including the corrections and deviations.
+* **Rules fixed before testing.** A verification plan with pass/fail criteria was frozen before any test (tag `vtp-1.0`). Every later choice was written into the evaluation methods before it was run (versions 1.0 to 1.31), including the corrections and deviations.
 * **No test patient ever influenced a choice.** Cross-patient models were tested leaving one patient out, with thresholds set on separate inner patients. Personalized designs were tested leaving one seizure out, with buffers, and with every design choice made per fold or by a pre-set rule.
 * **One final test on sealed data.** The design was frozen (tag `freeze-v1.13`) and tested once on 100 SeizeIT2 patients that nobody had looked at, under a protocol fixed beforehand (tags `lockbox-protocol-v1.17` and `lockbox-alarm-plan-v1.18`).
+* **One pre-registered second look.** After the D1 feedback, challengers were compared on development patients under an adoption rule fixed in advance (Section 14 of the evaluation methods). The winner was frozen (tag `freeze-d2.1`) and run on the same lockbox patients, with its verdict rule written down first.
 * **Honest baselines.** Results were compared with random alarms at the same false-alarm rate, and with a clock-only model, because the time of day alone predicts seizures in the hospital data.
 
 Data: CHB-MIT and Siena (development, 37 patients), TUSZ and a mental-arithmetic set (false alarms), SeizeIT2 (25 development and 100 sealed patients, behind-the-ear wearable EEG).
@@ -37,32 +39,39 @@ Data: CHB-MIT and Siena (development, 37 patients), TUSZ and a mental-arithmetic
 | SeizeIT2 dry run | 14 development patients | 0.669; alarms 46% at 4.6 per 24 h | F2-16 |
 | **Final test: SeizeIT2 lockbox** | **62 new patients (alarms: 20)** | **AUROC 0.621 (0.564–0.671); other patients only 0.547; alarms 38% at 5.83 per 24 h (chance 11%)** | **F2-17** |
 | Continuous learning, simulated | 25 SeizeIT2 development patients, forward in time | Learning beats not learning (0.606 against 0.454, p = 0.0015), but false alarms reach 13.8 per 24 h | F2-18 |
+| Improvement round, development | 36 patients (22 CHB-MIT and Siena, 14 SeizeIT2), seeds 0 and 1 | Ten challengers; per-channel + infra-slow features (D2.1) best: 0.720 against 0.690, higher in 27 of 36 | F2-19 |
+| D2.1 on the lockbox (second look) | Same 62 patients; alarms on the same 20 | 0.624 against 0.621 (+0.003, −0.013 to +0.017): not confirmed; alarms 42% at 6.26 per 24 h against 38% at 5.83 | F2-19 |
+| PPV / NPV | Committed alarm results | Lockbox PPV 0.10 (about 1 in 16 at one seizure a day at home); NPV 0.98, high for every model | F2-20 |
+| What the model relies on | 4 SeizeIT2 development seizures | Mostly the 10 min trend; large wearable artifacts (hundreds of µV) drive false risk | F2-21 |
 
-Details and evidence are in `docs/verification_results/D1.md` and `D2.md`.
+Details and evidence are in `docs/verification_results/D1.md` and `D2.md`; answers to each D1 comment are in `docs/d1_feedback_responses.md`.
 
 ## 4. What worked and what didn't
 
 **Worked:**
 
 1. **Personalization.** It was the one change that helped everywhere: CHB-MIT, Siena, SeizeIT2 development and the lockbox. The warning signs in EEG exist, but they differ from person to person.
-2. **The engineering.** The pipeline harmonizes three hospitals' formats and a wearable's, runs on a laptop, and is covered by 188 automated tests. It reproduced the dry run exactly on the final data.
-3. **The rigor.** The pre-registered testing and the sealed final test gave a number that can be trusted, and showed how optimistic the development numbers were (0.700 → 0.621).
+2. **The engineering.** The pipeline harmonizes three hospitals' formats and a wearable's, runs on a laptop, and is covered by 196 automated tests. It reproduced the dry run exactly on the final data, and every challenger and D2.1 reproduced its saved scores before being trusted.
+3. **The rigor.** The pre-registered testing and the sealed final test gave a number that can be trusted, and showed how optimistic the development numbers were (0.700 → 0.621). It caught two inflated results before they were reported as real: v1's best-of-297-seeds 0.713, and D2.1's development gain (+0.030 → +0.003 on new patients).
 
 **Didn't work:**
 
 1. **Cross-patient prediction,** however it was improved: normalization, context, TUSZ data, a neural network, richer features.
 2. **More data of the wrong kind.** Extra normal EEG, a looser normal-EEG definition for training, and a larger pool of other patients barely helped. The limit is seizures per person.
 3. **Alarm calibration.** Thresholds learned from earlier EEG drift. False alarms came out above target in almost every test, and badly so in the forward-in-time simulation.
+4. **Extra features and settings, once tested on new patients.** A different training preictal length (10–60 min, or chosen per patient), dropping windows that straddle two states, a patient-only model, and infra-slow and per-channel features. The last two helped on development patients but not measurably on new ones. A per-patient preictal length may exist, but 2–10 seizures per person are too few to find it.
+5. **Ignoring artifacts.** In development examples, bursts of several hundred µV from movement or interference raised the risk as much as real warning signs did (F2-21).
 
 ## 5. Are the results acceptable?
 
-* **As a course deliverable:** VT-15 (+15% over D1) failed at +10.5%, and that gain came from the time of day. VT-17 (80% of seizures at ≤ 5 false alarms per 24 h) failed. VT-16 (alarm logic) passed. Both failures are explained by evidence rather than left open.
+* **As a course deliverable:** the course plan (rev 2) asks for a mean AUROC at least 10% above D1, stating whether cross-patient or personalized. The personalized design meets it on new patients (0.621, +11.7%; D1 was cross-patient on hospital EEG, so the comparison isn't like for like). The stricter verification-plan test VT-15 (+15% for the cross-patient D2 model) failed at +10.5%, and that gain came from the time of day. VT-17 (80% of seizures at ≤ 5 false alarms per 24 h) failed. VT-16 (alarm logic) passed. Both failures are explained by evidence rather than left open.
 * **As a medical device:** no. Warning about a third of seizures, with around six false alarms a day, would neither protect a user nor keep their trust.
 * **As evidence for what to build next:** yes. The results are consistent across four datasets and hold on sealed data. They identify where the real problem lies: personal data and adaptive calibration, not model complexity.
 
 ## 6. Threats to validity
 
-* **Sample size.** The lockbox alarms rest on 20 patients and one seed; the AUROC on 62 patients and one seed. Seeds varied results by about ±0.007 throughout.
+* **Sample size.** The lockbox alarms rest on 20 patients and one seed; the AUROC on 62 patients and one seed. Seeds varied the mean by about ±0.007 throughout, but a single patient's AUROC by up to about 0.2.
+* **A second look at the lockbox.** D2.1 was run on the same patients the frozen design had been tested on. They took no part in choosing D2.1, but they weren't untouched, and nothing from that result is used for v3.
 * **Protocol deviations, all recorded in the evaluation methods:**
   * the equivalence check ran after the lockbox AUROC part, and its first attempt compared nothing because of a shell quirk;
   * the alarm part was reduced to 20 patients because of a pessimistic run-time estimate;
@@ -78,8 +87,9 @@ Details and evidence are in `docs/verification_results/D1.md` and `D2.md`.
 3. **Collect seizure labels automatically.** Seizure detection is far easier than prediction (0.87 in D1), so the device could label its own seizures, with user confirmation, to keep learning.
 4. **Target people with frequent seizures first,** where a personal model can learn quickly.
 5. **Test personal daily and multi-day seizure rhythms,** using the device's real clock, as a separate, pre-planned experiment.
-6. **Use the wearable's other sensors.** SeizeIT2 includes ECG, EMG and movement data, which could add heart-rate features and reject movement artifacts.
-7. **Regulatory path.** A device that changes after release needs its updates specified and verified in advance. The FDA's approach to predetermined change control plans for AI-enabled devices fits this design.
+6. **Use the wearable's other sensors, and reject artifacts.** SeizeIT2 includes ECG, EMG and movement data, which could add heart-rate features. An amplitude limit or accelerometer gating could stop movement artifacts from raising the risk (F2-21); this should be pre-registered and tested on development data first.
+7. **Report PPV at realistic seizure rates.** At home, with fewer seizures than in hospital, the same alarms would be right far less often (about 1 in 16 at one seizure a day). False-alarm rate is what limits usefulness.
+8. **Regulatory path.** A device that changes after release needs its updates specified and verified in advance. The FDA's approach to predetermined change control plans for AI-enabled devices fits this design.
 
 ## 8. Next
 
