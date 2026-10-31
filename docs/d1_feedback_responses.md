@@ -123,7 +123,7 @@ From the alarm results already committed (`results/d2_plus/existing_results.md`)
 * **NPV is high for every model,** including the near-chance ones, because almost every 30 minutes is seizure-free. A device that never alarmed would score about the same, so NPV says little here.
 * **D1's window-level confusion matrix** (most likely class, preictal vs interictal): sensitivity 0.30, specificity 0.73, PPV 0.09 with 8.6% of windows preictal. A PPV barely above the share of preictal windows matches D1's near-chance AUROC.
 
-Both depend on how often seizures happen, which is why the evaluation methods (Section 8) don't use them as pass/fail criteria. D2.1's lockbox alarm PPV and NPV are in `results/lockbox/d21_per_channel_slow_seizeit2_lockbox_alarms.md`; confusion matrices at each alarm threshold and time-based PPV/NPV come from `scripts/d2_plus_alarms.py`.
+Both depend on how often seizures happen, which is why the evaluation methods (Section 8) don't use them as pass/fail criteria. D2.1 (per-channel + infra-slow features) had the same lockbox alarm PPV as the frozen design: 0.100 against 0.098 at ≤ 5 false alarms per 24 h, and 0.164 against 0.149 at ≤ 1, with NPV about 0.97–0.98 for both (`results/lockbox/d21_per_channel_slow_seizeit2_lockbox_alarms.md`). The stricter setting makes alarms right more often (about 1 in 6–7), but warns about fewer seizures (18–23%); confusion matrices at each alarm threshold and time-based PPV/NPV come from `scripts/d2_plus_alarms.py`.
 
 ## 8. Why seeds mattered so much in v1
 

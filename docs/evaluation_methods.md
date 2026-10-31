@@ -736,14 +736,14 @@ Paired: +0.003 (95% bootstrap interval −0.013 to +0.017); D2.1 higher in 35 of
 
 **Alarm part (v1.31; Section 14.12, item 3).** On the same 20 patients (78 seizures), seed 0, frozen alarm settings (`results/lockbox/d21_per_channel_slow_seizeit2_lockbox_alarms.md`, which also gives alarm PPV and NPV):
 
-| Design | Target | Seizures warned | False alarms per 24 h | Chance | p |
-|---|---|---|---|---|---|
-| D2.1 | ≤ 5 | 33/78 (42%) | 6.26 | 12.2% | 3×10⁻¹¹ |
-| Frozen design | ≤ 5 | 30/78 (38%) | 5.83 | 11.4% | 7×10⁻¹⁰ |
-| D2.1 | ≤ 1 | 18/78 (23%) | 1.94 | 4.0% | 1×10⁻⁹ |
-| Frozen design | ≤ 1 | 14/78 (18%) | 1.69 | 3.5% | 4×10⁻⁷ |
+| Design | Target | Seizures warned | False alarms per 24 h | Chance | p | Alarm PPV | NPV |
+|---|---|---|---|---|---|---|---|
+| D2.1 | ≤ 5 | 33/78 (42%) | 6.26 | 12.2% | 3×10⁻¹¹ | 0.100 | 0.978 |
+| Frozen design | ≤ 5 | 30/78 (38%) | 5.83 | 11.4% | 7×10⁻¹⁰ | 0.098 | 0.977 |
+| D2.1 | ≤ 1 | 18/78 (23%) | 1.94 | 4.0% | 1×10⁻⁹ | 0.164 | 0.973 |
+| Frozen design | ≤ 1 | 14/78 (18%) | 1.69 | 3.5% | 4×10⁻⁷ | 0.149 | 0.972 |
 
-D2.1 warned a few more seizures at a slightly higher false-alarm rate, so both sit at about 3.5 times chance at the ≤ 5 target and 5–6 times chance at ≤ 1. Both exceed their false-alarm targets. No paired test of alarms was fixed in advance, and with 20 patients and one seed the difference (3 seizures at ≤ 5) isn't distinguishable from noise. The frozen design remains the reported final design.
+D2.1 warned a few more seizures at a slightly higher false-alarm rate, so both sit at about 3.5 times chance at the ≤ 5 target and 5–6 times chance at ≤ 1, with the same alarm PPV (0.10 at ≤ 5; 0.16 and 0.15 at ≤ 1). Both exceed their false-alarm targets. No paired test of alarms was fixed in advance, and with 20 patients and one seed the difference (3 seizures at ≤ 5) isn't distinguishable from noise. The frozen design remains the reported final design.
 
 ### 14.15 What the model relies on (characterization, v1.31; development patients only)
 

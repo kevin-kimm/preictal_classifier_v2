@@ -259,8 +259,8 @@ Long verification runs have their own scripts and write their evidence to `resul
 | **Final test: SeizeIT2 lockbox, frozen design AUROC (62 new patients)** | – | **0.621 (95% CI 0.564–0.671); other patients only 0.547** | – |
 | **Final test: SeizeIT2 lockbox alarms, ≤ 5 / ≤ 1 per 24 h (20 random patients)** | – | **38% warned at 5.83 per 24 h (chance 11%) / 18% at 1.69 (chance 3.5%)** | – |
 | Improvement round: D2.1 (per-channel + infra-slow), development / same lockbox patients | – | 0.720 vs 0.690 (optimistic) / 0.624 vs 0.621, not confirmed | – |
-| D2.1 lockbox alarms, ≤ 5 / ≤ 1 per 24 h (same 20 patients) | – | 42% warned at 6.26 per 24 h (chance 12%) / 23% at 1.94 (chance 4%) | – |
-| Alarm PPV / NPV, frozen design on the lockbox (≤ 5 setting) | 0.06 / 0.94 (cross-patient) | 0.10 / 0.98 | – |
+| D2.1 lockbox alarms, ≤ 5 / ≤ 1 per 24 h (same 20 patients) | – | 42% warned at 6.26 per 24 h (chance 12%, PPV 0.10) / 23% at 1.94 (chance 4%, PPV 0.16) | – |
+| Alarm PPV / NPV, frozen design on the lockbox, ≤ 5 / ≤ 1 setting | 0.06 / 0.94 (cross-patient, ≤ 10) | 0.10 / 0.98; 0.15 / 0.97 | – |
 | Event sensitivity | 0.21 (chance at this rate: 0.20) | 0.16 (chance: 0.11) | Not applicable |
 | False alarms per 24 h, test patients | 10.61 | 5.84 | – |
 | False alarms per 24 h, TUSZ (unseen patients) | 69.67 | 55.2 (held-out half) | – |
@@ -288,7 +288,7 @@ A planned sensitivity analysis with a 1-hour gap for normal EEG lowered the froz
 
 * **No gain:** a different training preictal length (10–60 min, or chosen per patient from earlier seizures), dropping windows that straddle two states, and averaging in a patient-only model.
 * **Development gain:** infra-slow features (+0.012) and per-channel features (+0.023), and both together (D2.1, 0.720 against 0.690).
-* **On the lockbox,** D2.1 scored 0.624 against 0.621 on the same 62 patients (+0.003, 95% interval −0.013 to +0.017), so it wasn't confirmed. Its alarms were similar (42% at 6.26 against 38% at 5.83 per 24 h). Picking the best of ten versions on the same patients inflated the winner, which is the same effect as v1's best of 297 seeds (F2-19).
+* **On the lockbox,** D2.1 scored 0.624 against 0.621 on the same 62 patients (+0.003, 95% interval −0.013 to +0.017), so it wasn't confirmed. Its alarms were similar (42% at 6.26 against 38% at 5.83 per 24 h, both with PPV 0.10). Picking the best of ten versions on the same patients inflated the winner, which is the same effect as v1's best of 297 seeds (F2-19).
 * **PPV:** on the lockbox, about 1 alarm in 10 was followed by a seizure; at one seizure a day at home it would be about 1 in 16 (F2-20).
 * **What the model relies on:** on SeizeIT2 development seizures, mostly the change over the last 10 minutes. Large wearable artifacts (hundreds of µV) can imitate that change, which points to artifact rejection as a v3 hypothesis (F2-21; `scripts/explain_seizeit2.py`).
 
