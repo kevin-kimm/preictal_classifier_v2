@@ -7,9 +7,9 @@ The D1 report came back with comments from the course instructor. Each one is an
 | # | Comment | How it is answered | Status |
 |---|---|---|---|
 | 1 | How does this compare with patients' ability to predict their own seizures (prodrome or aura)? The device would need to do better, or give more precise timing. | Literature (below), plus warning windows of 10–60 min scored with chance recomputed for each (Section 14.4) | Literature done; timing pending |
-| 2 | Some patients may have a longer or shorter "true" preictal period. Change the amount of interictal time and see if accuracy changes. Try unsupervised learning. | Training preictal length 10–60 min, and chosen per patient (Section 14.2); interictal gap 1, 2, 4 and 8 h (Section 14.9); isolation-forest anomaly score with no seizure labels (Section 14.6) | Pending |
+| 2 | Some patients may have a longer or shorter "true" preictal period. Change the amount of interictal time and see if accuracy changes. Try unsupervised learning. | Training preictal length 10–60 min, and chosen per patient (Section 14.2); interictal gap 1, 2, 4 and 8 h (Section 14.9); isolation-forest anomaly score with no seizure labels (Section 14.6) | Preictal length done (below); interictal gap and unsupervised pending |
 | 3 | Is 30 s sufficient? Infra-slow oscillations. | Check whether the amplifiers recorded below 0.5 Hz, then 5-minute infra-slow features as a challenger (Section 14.7) | Check done (below); challenger pending |
-| 4 | If a window contains two states (e.g. a seizure starts at 22 s), how is it classified? Could edge cases hurt accuracy? | By design (below), plus a challenger trained without such windows and AUROC on test windows without them (Section 14.2) | Design answer done; experiment pending |
+| 4 | If a window contains two states (e.g. a seizure starts at 22 s), how is it classified? Could edge cases hurt accuracy? | By design (below), plus a challenger trained without such windows and AUROC on test windows without them (Section 14.2) | Done |
 | 5 | Did you only use 25 people out of the datasets? | Below | Done |
 | 6 | Seizure detection (0.865): surprised it isn't higher. Can you see the difference in the missed seizures? | Per-seizure detection scores and EEG of the best and worst detected seizures (Section 14.8) | Done |
 | 7 | PPV would be useful, and a confusion matrix. | PPV, NPV and confusion matrices for every alarm result, at hospital and home seizure rates (Sections 14.1, 14.5) | Existing results done (below); new runs pending |
@@ -25,6 +25,24 @@ Prospective studies have tested whether people with epilepsy can foresee their s
 
 So patients' own forecasting, where it works, is coarse: hours rather than a specific 30-minute window, and in only some patients. A device adds value if it beats chance over a 30-minute window, which the frozen design does (38% of seizures at 5.8 false alarms per 24 h, 3 times chance, on 20 new patients), or if it gives more precise timing. Auras, the first symptom of a focal seizure, are already part of the seizure and give seconds to a minute or two of warning; that is the lead time the device has to beat. The warning-window analysis (Section 14.4) shows how performance changes as the window narrows.
 
+## 2. Is there a different "true" preictal period per patient?
+
+Every length was tested as a challenger to the frozen design (30 min), on the same test windows and patients (22 CHB-MIT and Siena, 14 SeizeIT2), seeds 0 and 1 (`results/d2_plus/*/arms.md`):
+
+| Training preictal length | Change in mean AUROC (36 patients) | Higher than 30 min in |
+|---|---|---|
+| 10 min | 0.000 | 15 of 36 |
+| 20 min | −0.003 | 18 of 36 |
+| 45 min | +0.003 | 18 of 36 |
+| 60 min | −0.019 | 16 of 34 |
+| Chosen per patient from earlier seizures (CHB-MIT and Siena) | 0.000 | 7 of 22 |
+
+* **Individual patients do differ a lot.** chb02 scores 0.80 with 10 min against 0.60 with 30, while PN03 drops from 0.86 to 0.55. Picking each CHB-MIT and Siena patient's best length *after seeing their test results* would raise the mean from 0.705 to 0.750.
+* **But that can't be done honestly with this data.** When each patient's length is chosen from their own earlier seizures only, the gain disappears (0.705 against 0.705), and the chosen length changed from one held-out seizure to the next. With 2–9 seizures per patient, the "best" length is mostly noise.
+* **So:** a patient-specific preictal period may well exist, as suggested, but these recordings have too few seizures per person to find it reliably. Long-term wearable recordings with many seizures per person could.
+
+(The per-patient choice was far slower on SeizeIT2 and was completed for 5 of its 14 patients; it is reported as partial.)
+
 ## 3. Infra-slow activity: was it recorded?
 
 Before testing infra-slow features, `scripts/check_infraslow.py` looked at the median power spectrum below 3 Hz of 12 random recordings per dataset (`results/d2_plus/infraslow_check.md`):
@@ -37,6 +55,8 @@ Before testing infra-slow features, `scripts/check_infraslow.py` looked at the m
 
 The spectra (`results/d2_plus/infraslow_check.png`) make this plain. CHB-MIT's power falls by almost three orders of magnitude from 0.5 Hz down to 0.01 Hz. Siena's stays flat across the infra-slow range. SeizeIT2's rises to about ten times Siena's, which is more than brain activity alone would give and points to electrode drift and movement in a wearable.
 
+**As a challenger,** the 5-minute infra-slow features raised development AUROC slightly (+0.012 pooled, higher in 19 of 36 patients), and combined with per-channel features they gave the best development design (0.720 against 0.690). On 62 new SeizeIT2 patients the combination scored 0.624 against 0.621, a difference not distinguishable from zero (−0.013 to +0.017). So a longer look-back doesn't measurably improve prediction on new patients.
+
 So for most of the development data (CHB-MIT), a longer window can't add infra-slow information; the 10 min context features already give the frozen design a longer look at the 0.5–45 Hz features. The `slow` challenger still runs on both development sets as planned, and SeizeIT2 is where it has a chance.
 
 ## 4. Windows that contain two states
@@ -48,7 +68,9 @@ Each 30 s window is labeled by the state at its **end** (evaluation methods, Sec
 * the first 6 windows labeled ictal contain mostly preictal EEG (up to 25 s of it). This affects the ictal class in training and seizure detection, which is why D1 reported detection both for all ictal windows (0.810) and for windows entirely inside a seizure (0.865);
 * interictal windows are at least 4 h from any seizure, so they never contain another state's EEG.
 
-The comment's example (a seizure starting 22 s into a window) is therefore an ictal window in training. The `pure` challenger removes all such windows from training, and every run reports how many there are.
+The comment's example (a seizure starting 22 s into a window) is therefore an ictal window in training.
+
+**Tested:** these windows don't hurt accuracy. Scoring only the test windows that don't straddle two states gives the same AUROC (0.688 on CHB-MIT and Siena, 0.655 on SeizeIT2, identical to all test windows), and training without them was slightly worse (−0.015 pooled, higher in only 12 of 36 patients).
 
 ## 5. Why 25 test patients
 

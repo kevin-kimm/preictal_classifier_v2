@@ -2,7 +2,7 @@
 
 | Doc | Version | Written |
 |---|---|---|---|
-| EVM-001 | 1.29 | v1.0 before any model was trained; v1.1 and v1.2 after D1, before any D2 result / v1.3 after a one seed D2 preview / v1.4 after the full D2 run / v1.5 after the personalized variants / v1.6 while the v1.5 test was running, before any v1.6 result / v1.7 before the lockbox audit / v1.8 and v1.9 after it / v1.10 before the final development round / v1.11 before splitting SeizeIT2 / v1.12 during the final development round / v1.13 freezes the design / v1.14 ... / v1.15 adds the sensitivity analysis and SeizeIT2 adapter details / v1.16 the dry run and lockbox commands / v1.17 fixes the lockbox protocol before the lockbox is opened / v1.18 records the lockbox AUROC result and changes the alarm part before any alarm result was seen / v1.19 adds the continuous personalization simulation before running it / v1.20 starts v3 development with adaptive thresholds / v1.21 records that result and adds the false alarm breakdown / v1.22 adopts the v3 scope and adds the first Phase A experiment / v1.23 records its result, a recorded deviation, and Phase A experiment 2 / v1.24 records experiment 2's result and a Phase B secondary question / v1.25 adds the D2 improvement round after the D1 feedback, before any of its results / v1.26 adds two challengers before any challenger result / v1.27 sets the challengers' seeds and run order from the measured run time, before any challenger result / v1.28 defers the unfinished per-patient-length challenger and fixes the D2.1 decision and lockbox protocol before the last challenger's result / v1.29 records the `slow` result and runs the combination step (see Section 13) |
+| EVM-001 | 1.30 | v1.0 before any model was trained; v1.1 and v1.2 after D1, before any D2 result / v1.3 after a one seed D2 preview / v1.4 after the full D2 run / v1.5 after the personalized variants / v1.6 while the v1.5 test was running, before any v1.6 result / v1.7 before the lockbox audit / v1.8 and v1.9 after it / v1.10 before the final development round / v1.11 before splitting SeizeIT2 / v1.12 during the final development round / v1.13 freezes the design / v1.14 ... / v1.15 adds the sensitivity analysis and SeizeIT2 adapter details / v1.16 the dry run and lockbox commands / v1.17 fixes the lockbox protocol before the lockbox is opened / v1.18 records the lockbox AUROC result and changes the alarm part before any alarm result was seen / v1.19 adds the continuous personalization simulation before running it / v1.20 starts v3 development with adaptive thresholds / v1.21 records that result and adds the false alarm breakdown / v1.22 adopts the v3 scope and adds the first Phase A experiment / v1.23 records its result, a recorded deviation, and Phase A experiment 2 / v1.24 records experiment 2's result and a Phase B secondary question / v1.25 adds the D2 improvement round after the D1 feedback, before any of its results / v1.26 adds two challengers before any challenger result / v1.27 sets the challengers' seeds and run order from the measured run time, before any challenger result / v1.28 defers the unfinished per-patient-length challenger and fixes the D2.1 decision and lockbox protocol before the last challenger's result / v1.29 records the `slow` result and runs the combination step / v1.30 records the D2.1 choice and its lockbox AUROC result (see Section 13) |
 
 This document fixes how models are trained, tuned and scored for Deliverables 1 and 2. It adds detail to the verification plan (tag `vtp-1.0`) and doesn't change any of its pass/fail criteria. It is committed before any model is trained so the Git history shows these choices came first. Anything changed after results are seen goes in the version history (Section 11).
 
@@ -562,6 +562,7 @@ SeizeIT2 v1.1.0 (OpenNeuro ds005873, CC0 licence) was downloaded on 2026-09-28 i
 | 1.27 | 2026-10-26 | The equivalence checks passed (22 of 22 and 14 of 14 identical) and measured 2.5–2.7 min per patient and seed, so the full plan would take about 60 h. Before any challenger result: challengers run with seeds 0 and 1, paired with the frozen arm on the same seeds; the frozen arm's results are taken from the committed files the checks reproduced; arms run in a fixed order (Section 14.11). The adoption rule is unchanged |
 | 1.28 | 2026-10-29 | Seven challengers complete on both development sets (only `per_channel` meets the adoption rule); `pp_length` complete on CHB-MIT and Siena but only 4 of 14 SeizeIT2 patients after a day, so it is deferred as partial; before the `slow` result: the D2.1 decision and its lockbox protocol (Section 14.12) |
 | 1.29 | 2026-10-29 | `slow` result: it also meets the adoption rule (+0.012, higher in 19 of 36), so the combination step of Section 14.12 applies: `per_channel_slow` is run on both development sets before D2.1 is chosen. The lockbox runner and the slow-feature extraction gain the options that the winner may need (Section 14.13) |
+| 1.30 | 2026-10-31 | D2.1 = `per_channel_slow` (pooled development AUROC 0.720 against 0.690, higher in 27 of 36); its equivalence check passed (14 of 14); frozen as `freeze-d2.1`. Lockbox AUROC: 0.624 against the frozen design's 0.621 on the same 62 patients (+0.003, 95% CI −0.013 to +0.017): not confirmed, so the frozen design remains the final design (Section 14.14) |
 
 ## 14. D2 improvement round (v1.25, 2026-10-26), written before any of its results
 
@@ -703,4 +704,34 @@ The adoption rule (Section 14.3) is unchanged and is applied to the seeds actual
 **Combination step (Section 14.12, unchanged rule).** `per_channel_slow` (the frozen features, the slow features and the per-channel features, in that column order, with the per-channel rule for empty columns) is run on both development sets, seeds 0 and 1. D2.1 is whichever of `per_channel`, `slow` and `per_channel_slow` has the highest pooled mean AUROC over the 36 patients. Nothing else changes.
 
 **What the winner needs on the lockbox.** `scripts/run_seizeit2_d21.py --design {per_channel, slow, per_channel_slow}` runs that design; its `--check` must reproduce the same challenger's SeizeIT2 development AUROC exactly before the lockbox is touched. If D2.1 uses slow features, they are extracted for the lockbox patients only after the `freeze-d2.1` tag exists (`scripts/extract_slow_features.py --dataset seizeit2 --group lockbox --lockbox-run`, which refuses otherwise). The protocol of Section 14.12 (items 2 to 5) applies to whichever design wins.
+
+### 14.14 D2.1 and its lockbox result (v1.30)
+
+**Choice (rule of Section 14.13).** Pooled over the 36 development patients (seeds 0 and 1):
+
+| Design | Mean AUROC | Change vs frozen | Higher than frozen in |
+|---|---|---|---|
+| Frozen design | 0.690 | – | – |
+| `slow` | 0.702 | +0.012 | 19 of 36 |
+| `per_channel` | 0.713 | +0.023 | 25 of 36 |
+| **`per_channel_slow`** | **0.720** | **+0.030** | **27 of 36** |
+
+D2.1 is therefore `per_channel_slow`: the frozen design plus per-channel and infra-slow features (CHB-MIT and Siena +0.015, 15 of 22; SeizeIT2 development +0.055, 12 of 14).
+
+**Equivalence check.** `run_seizeit2_d21.py --check --design per_channel_slow` reproduced the challenger's SeizeIT2 development AUROC exactly for all 14 patients (seed 0). D2.1 was then frozen as the Git tag `freeze-d2.1` (2026-10-30), and the slow features were extracted for the lockbox patients only after that.
+
+**Lockbox AUROC (seed 0, the same 62 patients and folds as Section 11.8).**
+
+| Design | Mean AUROC | 95% CI |
+|---|---|---|
+| D2.1 | 0.624 | 0.566–0.677 |
+| Frozen design | 0.621 | 0.564–0.671 |
+
+Paired: +0.003 (95% bootstrap interval −0.013 to +0.017); D2.1 higher in 35 of 62; Wilcoxon p = 0.148.
+
+**Verdict, by the rule fixed in v1.28: not confirmed.** The frozen design remains the reported final design, and its lockbox result (0.621) the project's estimate on new patients.
+
+**Reading.** The development gain (+0.030 pooled, +0.055 on SeizeIT2) mostly didn't carry over to new patients. The likeliest reason is selection: D2.1 was the best of ten challengers on the same 36 patients, so part of its development advantage was luck. The interval rules out a lockbox gain larger than about 0.017 and a loss larger than about 0.013. These patients were a second look at the lockbox (Section 14.12), and, as fixed there, nothing from this result is used to choose anything in v3.
+
+**Still to run.** The lockbox alarm part for D2.1 (Section 14.12, item 3), on the same 20 patients as the frozen design's alarm result.
 
