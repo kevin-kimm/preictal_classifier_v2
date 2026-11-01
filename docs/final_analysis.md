@@ -19,7 +19,7 @@ The results support one direction clearly: a device that keeps learning its wear
 
 The project was run as a design-controlled software-as-a-medical-device prototype:
 
-* **Rules fixed before testing.** A verification plan with pass/fail criteria was frozen before any test (tag `vtp-1.0`). Every later choice was written into the evaluation methods before it was run (versions 1.0 to 1.31), including the corrections and deviations.
+* **Rules fixed before testing.** A verification plan with pass/fail criteria was frozen before any test (tag `vtp-1.0`). Every later choice was written into the evaluation methods before it was run (versions 1.0 to 1.33), including the corrections and deviations.
 * **No test patient ever influenced a choice.** Cross-patient models were tested leaving one patient out, with thresholds set on separate inner patients. Personalized designs were tested leaving one seizure out, with buffers, and with every design choice made per fold or by a pre-set rule.
 * **One final test on sealed data.** The design was frozen (tag `freeze-v1.13`) and tested once on 100 SeizeIT2 patients that nobody had looked at, under a protocol fixed beforehand (tags `lockbox-protocol-v1.17` and `lockbox-alarm-plan-v1.18`).
 * **One pre-registered second look.** After the D1 feedback, challengers were compared on development patients under an adoption rule fixed in advance (Section 14 of the evaluation methods). The winner was frozen (tag `freeze-d2.1`) and run on the same lockbox patients, with its verdict rule written down first.
@@ -43,6 +43,8 @@ Data: CHB-MIT and Siena (development, 37 patients), TUSZ and a mental-arithmetic
 | D2.1 on the lockbox (second look) | Same 62 patients; alarms on the same 20 | 0.624 against 0.621 (+0.003, −0.013 to +0.017): not confirmed; alarms 42% at 6.26 per 24 h against 38% at 5.83 | F2-19 |
 | PPV / NPV | Committed alarm results | Lockbox PPV 0.10 (about 1 in 16 at one seizure a day at home); NPV 0.98, high for every model | F2-20 |
 | What the model relies on | 4 SeizeIT2 development seizures | Mostly the 10 min trend; large wearable artifacts (hundreds of µV) drive false risk | F2-21 |
+| Warning window | Development patients, 10–60 min | At chance at 10–20 min on hospital EEG; useful horizon 30–60 min | F2-22 |
+| Annotation and artifact audit | All development patients | No late onsets or label confound; on the wearable, false alarms follow artifacts 1.5 times as often as normal EEG | F2-23 |
 
 Details and evidence are in `docs/verification_results/D1.md` and `D2.md`; answers to each D1 comment are in `docs/d1_feedback_responses.md`.
 
@@ -76,7 +78,7 @@ Details and evidence are in `docs/verification_results/D1.md` and `D2.md`; answe
   * the equivalence check ran after the lockbox AUROC part, and its first attempt compared nothing because of a shell quirk;
   * the alarm part was reduced to 20 patients because of a pessimistic run-time estimate;
   * in the frozen v2 features, two of eight left-right channel pairs never matched (a spelling erratum, kept so the frozen code stayed identical).
-* **Labels.** Seizure onsets come from expert annotations. The 4 h definition of normal EEG affects results by about 0.05. SeizeIT2's anonymized clock times mean its files had to be placed in run order, with conservative rules.
+* **Labels.** Seizure onsets come from expert annotations. An audit with a seizure detector trained on other patients found no sign of late onsets or a label confound, and no clear missed seizure in the normal EEG (F2-23), though on the wearable it could check only the 7% of seizures it detected. The 4 h definition of normal EEG affects results by about 0.05. SeizeIT2's anonymized clock times mean its files had to be placed in run order, with conservative rules.
 * **Setting.** All recordings come from hospital monitoring, where people are often sleep-deprived or have reduced medication, which is unlike daily life with a consumer device.
 * **Time of day.** It predicts seizures in hospital data partly because of how recordings are scheduled, so it was excluded from the final design. A real device knows the time, and a person's own daily seizure rhythm may be a genuine signal worth testing separately.
 
@@ -84,7 +86,7 @@ Details and evidence are in `docs/verification_results/D1.md` and `D2.md`; answe
 
 1. **Build AuraSense as a device that keeps learning its wearer.** Start from a general model and a calibration period, then retrain after each seizure (F2-18). Be honest with users that day-one prediction is near chance.
 2. **Make alarm thresholds adaptive.** Recalibrate them continuously on recent normal EEG, and test that adaptation forward in time, since this is the main obstacle the simulation found.
-3. **Collect seizure labels automatically.** Seizure detection is far easier than prediction (0.87 in D1), so the device could label its own seizures, with user confirmation, to keep learning.
+3. **Collect seizure labels with the user, helped by detection.** On hospital EEG, detection is far easier than prediction (0.87 in D1). On the behind-the-ear wearable, though, a detector trained on other people caught only 7% of seizures at a strict threshold (F2-23). So the user's or a caregiver's confirmation has to stay central. A personal detector, or the wearable's heart-rate and movement signals, may help it label seizures automatically later.
 4. **Target people with frequent seizures first,** where a personal model can learn quickly.
 5. **Test personal daily and multi-day seizure rhythms,** using the device's real clock, as a separate, pre-planned experiment.
 6. **Use the wearable's other sensors, and reject artifacts.** SeizeIT2 includes ECG, EMG and movement data, which could add heart-rate features. An amplitude limit or accelerometer gating could stop movement artifacts from raising the risk (F2-21); this should be pre-registered and tested on development data first.

@@ -1,0 +1,15 @@
+subject,timeline,start_s,duration_s,peak,share_with_artifact
+chbmit:chb03,chbmit|chb03,141935.0,30.0,0.9841,1.0
+chbmit:chb03,chbmit|chb03,141985.0,30.0,0.9973,1.0
+chbmit:chb04,chbmit|chb04,286234.0,35.0,0.99,1.0
+chbmit:chb04,chbmit|chb04,492370.0,40.0,0.9945,1.0
+chbmit:chb04,chbmit|chb04,493375.0,85.0,0.994,1.0
+chbmit:chb04,chbmit|chb04,567444.0,80.0,0.995,1.0
+chbmit:chb07,chbmit|chb07,127561.0,30.0,0.9971,1.0
+chbmit:chb09,chbmit|chb09,118564.0,80.0,0.9469,1.0
+chbmit:chb09,chbmit|chb09,122799.0,60.0,0.9554,1.0
+chbmit:chb11,chbmit|chb11,142964.0,35.0,0.995,1.0
+chbmit:chb11,chbmit|chb11,159432.0,30.0,0.9825,1.0
+chbmit:chb11,chbmit|chb11,176989.0,30.0,0.9878,0.667
+chbmit:chb18,chbmit|chb18,173413.0,50.0,0.9957,0.8
+chbmit:chb22,chbmit|chb22,353885.0,30.0,0.9725,0.0

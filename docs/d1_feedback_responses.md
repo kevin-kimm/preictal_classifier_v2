@@ -6,7 +6,7 @@ The D1 report came back with comments from the course instructor. Each one is an
 
 | # | Comment | How it is answered | Status |
 |---|---|---|---|
-| 1 | How does this compare with patients' ability to predict their own seizures (prodrome or aura)? The device would need to do better, or give more precise timing. | Literature (below), plus warning windows of 10–60 min scored with chance recomputed for each (Section 14.4) | Literature done; timing pending |
+| 1 | How does this compare with patients' ability to predict their own seizures (prodrome or aura)? The device would need to do better, or give more precise timing. | Literature (below), plus warning windows of 10–60 min scored with chance recomputed for each (Section 14.4) | Done (below) |
 | 2 | Some patients may have a longer or shorter "true" preictal period. Change the amount of interictal time and see if accuracy changes. Try unsupervised learning. | Training preictal length 10–60 min, and chosen per patient (Section 14.2); interictal gap 1, 2, 4 and 8 h (Section 14.9); isolation-forest anomaly score with no seizure labels (Section 14.6) | Preictal length done (below); interictal gap and unsupervised pending |
 | 3 | Is 30 s sufficient? Infra-slow oscillations. | Check whether the amplifiers recorded below 0.5 Hz, then 5-minute infra-slow features as a challenger (Section 14.7) | Done (below) |
 | 4 | If a window contains two states (e.g. a seizure starts at 22 s), how is it classified? Could edge cases hurt accuracy? | By design (below), plus a challenger trained without such windows and AUROC on test windows without them (Section 14.2) | Done |
@@ -23,7 +23,17 @@ Prospective studies have tested whether people with epilepsy can foresee their s
 * **E-diary self-prediction.** In 19 adults with focal epilepsy and frequent seizures, patients' own predictions were linked to seizures in the following 6 h, and still within 12 h (multivariate odds ratio 2.84). The best predictors caught about half their seizures. Predictions were made over hours, not minutes ([Borkowski et al., 2013](https://stacks.cdc.gov/view/cdc/195437)).
 * **Prodromes.** Of 500 patients interviewed at three epilepsy centres, about 6% reported prodromes at least 30 min before seizures. Followed prospectively, they predicted seizures no better than a random predictor, and some prodromes were recorded only after the seizure ([Maiwald et al., 2011](https://jeti.uni-freiburg.de/papers/YEBEH2581.pdf)).
 
-So patients' own forecasting, where it works, is coarse: hours rather than a specific 30-minute window, and in only some patients. A device adds value if it beats chance over a 30-minute window, which the frozen design does (38% of seizures at 5.8 false alarms per 24 h, 3 times chance, on 20 new patients), or if it gives more precise timing. Auras, the first symptom of a focal seizure, are already part of the seizure and give seconds to a minute or two of warning; that is the lead time the device has to beat. The warning-window analysis (Section 14.4) shows how performance changes as the window narrows.
+So patients' own forecasting, where it works, is coarse: hours rather than a specific 30-minute window, and in only some patients. A device adds value if it beats chance over a 30-minute window, which the frozen design does (38% of seizures at 5.8 false alarms per 24 h, 3 times chance, on 20 new patients), or if it gives more precise timing. Auras, the first symptom of a focal seizure, are already part of the seizure and give seconds to a minute or two of warning; that is the lead time the device has to beat. The warning-window analysis (Section 14.4) shows how performance changes as the window narrows. Same model and thresholds, ≤ 5 false alarms per 24 h, frozen design on the development patients, with chance recomputed for each window (`results/d2_plus/*/alarms_frozen.md`):
+
+| Warning window | CHB-MIT and Siena: warned (times chance) | SeizeIT2: warned (times chance) |
+|---|---|---|
+| 10 min | 2% (1.0) | 15% (4.8) |
+| 20 min | 5% (1.3) | 20% (3.3) |
+| 30 min | 15% (2.4) | 46% (5.0) |
+| 45 min | 18% (1.9) | 51% (3.9) |
+| 60 min | 20% (1.7) | 60% (3.5) |
+
+So the device doesn't give more precise timing. At 10–20 minutes it is at chance on hospital EEG, and warns only 15–20% of seizures on the wearable. Many of its alarms come 20–30 minutes ahead, partly because it was trained on a 30 minute period and its 30 minute quiet period after an alarm stops a second, later one. Its useful horizon is 30–60 minutes. That is shorter and more specific than patients' own forecasts, which work over hours, but it is a risk signal rather than a countdown. These are development patients; on new patients the 30 minute result was 38% at 3.4 times chance.
 
 ## 2. Is there a different "true" preictal period per patient?
 

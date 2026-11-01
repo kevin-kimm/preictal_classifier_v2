@@ -246,7 +246,7 @@ Long verification runs have their own scripts and write their evidence to `resul
 |---|---|---|
 | 1. Rebuild and first evaluation | [`docs/verification_results/D1.md`](docs/verification_results/D1.md) | VT-01 to VT-14 complete (VT-13 failed) |
 | 2. Final prototype with alarm logic | [`docs/verification_results/D2.md`](docs/verification_results/D2.md) | VT-15 and VT-17 failed, VT-16 passed; patient-specific test reported |
-| 2. Improvement round after the D1 feedback | [`docs/d1_feedback_responses.md`](docs/d1_feedback_responses.md), `results/d2_plus/`, `results/lockbox/d21_*` | Done: D2.1 not confirmed on the lockbox; frozen design stays final (evaluation methods v1.25–v1.31, Section 14; F2-19 to F2-21) |
+| 2. Improvement round after the D1 feedback | [`docs/d1_feedback_responses.md`](docs/d1_feedback_responses.md), `results/d2_plus/`, `results/lockbox/d21_*` | Done: D2.1 not confirmed on the lockbox; frozen design stays final (evaluation methods v1.25–v1.33, Section 14; F2-19 to F2-23) |
 | 3. Interface and live Cyton test | `docs/verification_results/D3.md` | Not started |
 
 ### Current model metrics
@@ -293,6 +293,8 @@ A planned sensitivity analysis with a 1-hour gap for normal EEG lowered the froz
 * **On the lockbox,** D2.1 scored 0.624 against 0.621 on the same 62 patients (+0.003, 95% interval −0.013 to +0.017), so it wasn't confirmed. Its alarms were similar (42% at 6.26 against 38% at 5.83 per 24 h, both with PPV 0.10). Picking the best of ten versions on the same patients inflated the winner, which is the same effect as v1's best of 297 seeds (F2-19).
 * **PPV:** on the lockbox, about 1 alarm in 10 was followed by a seizure; at one seizure a day at home it would be about 1 in 16 (F2-20).
 * **What the model relies on:** on SeizeIT2 development seizures, mostly the change over the last 10 minutes. Large wearable artifacts (hundreds of µV) can imitate that change, which points to artifact rejection as a v3 hypothesis (F2-21; `scripts/explain_seizeit2.py`).
+* **Annotation and artifact audit:** a seizure detector trained on other patients found no sign of late onsets, no label confound and no clear missed seizures. On the wearable, false alarms followed an artifact 1.5 times as often as normal EEG did, so an artifact gate is a v3 candidate (F2-23; `scripts/audit_annotations_artifacts.py`).
+* **Timing:** at 10–20 minute warning windows the design is at or near chance on hospital EEG; its useful horizon is 30–60 minutes (F2-22).
 
 ## Comparison with v1
 
@@ -326,8 +328,8 @@ A planned sensitivity analysis with a 1-hour gap for normal EEG lowered the froz
 | 2 | Continuous-personalization simulation (added) | – | Done (F2-18) |
 | 2 | Final analysis of results | 10% | Done ([final_analysis.md](docs/final_analysis.md)) |
 | 2 | README | 15% | Checked by `scripts/check_readme.py` (VT-20) |
-| 2 | Annotation and artifact audit (added): late onsets, unannotated seizures, artifacts and false alarms | – | Planned before any result ([evaluation methods](docs/evaluation_methods.md) v1.32, Section 14.16) |
-| 2 | Improvement round after the D1 feedback (added): preictal length, infra-slow and per-channel features, PPV/NPV, model explanation | – | Done: D2.1 not confirmed on new patients ([evaluation methods](docs/evaluation_methods.md) v1.25–v1.31, Section 14; [responses](docs/d1_feedback_responses.md)); unsupervised test and interictal-gap runs still to run |
+| 2 | Annotation and artifact audit (added): late onsets, unannotated seizures, artifacts and false alarms | – | Done: annotations hold up; artifact gate worth testing on the wearable ([evaluation methods](docs/evaluation_methods.md) v1.32–v1.33, Sections 14.16–14.17; F2-22, F2-23) |
+| 2 | Improvement round after the D1 feedback (added): preictal length, infra-slow and per-channel features, PPV/NPV, model explanation | – | Done: D2.1 not confirmed on new patients ([evaluation methods](docs/evaluation_methods.md) v1.25–v1.33, Section 14; [responses](docs/d1_feedback_responses.md)); unsupervised test and interictal-gap runs still to run |
 | 3 (20%) | Local interface showing dataset replay and alarms | 10% | Not started |
 | 3 | Real-time Cyton acquisition, live baseline, seizure-free recording | – | Not started |
 | 3 | Analysis report compared with D1 and D2 | 10% | Not started |

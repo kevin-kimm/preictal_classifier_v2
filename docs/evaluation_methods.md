@@ -2,7 +2,7 @@
 
 | Doc | Version | Written |
 |---|---|---|---|
-| EVM-001 | 1.32 | v1.0 before any model was trained; v1.1 and v1.2 after D1, before any D2 result / v1.3 after a one seed D2 preview / v1.4 after the full D2 run / v1.5 after the personalized variants / v1.6 while the v1.5 test was running, before any v1.6 result / v1.7 before the lockbox audit / v1.8 and v1.9 after it / v1.10 before the final development round / v1.11 before splitting SeizeIT2 / v1.12 during the final development round / v1.13 freezes the design / v1.14 ... / v1.15 adds the sensitivity analysis and SeizeIT2 adapter details / v1.16 the dry run and lockbox commands / v1.17 fixes the lockbox protocol before the lockbox is opened / v1.18 records the lockbox AUROC result and changes the alarm part before any alarm result was seen / v1.19 adds the continuous personalization simulation before running it / v1.20 starts v3 development with adaptive thresholds / v1.21 records that result and adds the false alarm breakdown / v1.22 adopts the v3 scope and adds the first Phase A experiment / v1.23 records its result, a recorded deviation, and Phase A experiment 2 / v1.24 records experiment 2's result and a Phase B secondary question / v1.25 adds the D2 improvement round after the D1 feedback, before any of its results / v1.26 adds two challengers before any challenger result / v1.27 sets the challengers' seeds and run order from the measured run time, before any challenger result / v1.28 defers the unfinished per-patient-length challenger and fixes the D2.1 decision and lockbox protocol before the last challenger's result / v1.29 records the `slow` result and runs the combination step / v1.30 records the D2.1 choice and its lockbox AUROC result / v1.31 records D2.1's lockbox alarm result and the model-explanation figures / v1.32 adds the annotation and artifact audit before running it (see Section 13) |
+| EVM-001 | 1.33 | v1.0 before any model was trained; v1.1 and v1.2 after D1, before any D2 result / v1.3 after a one seed D2 preview / v1.4 after the full D2 run / v1.5 after the personalized variants / v1.6 while the v1.5 test was running, before any v1.6 result / v1.7 before the lockbox audit / v1.8 and v1.9 after it / v1.10 before the final development round / v1.11 before splitting SeizeIT2 / v1.12 during the final development round / v1.13 freezes the design / v1.14 ... / v1.15 adds the sensitivity analysis and SeizeIT2 adapter details / v1.16 the dry run and lockbox commands / v1.17 fixes the lockbox protocol before the lockbox is opened / v1.18 records the lockbox AUROC result and changes the alarm part before any alarm result was seen / v1.19 adds the continuous personalization simulation before running it / v1.20 starts v3 development with adaptive thresholds / v1.21 records that result and adds the false alarm breakdown / v1.22 adopts the v3 scope and adds the first Phase A experiment / v1.23 records its result, a recorded deviation, and Phase A experiment 2 / v1.24 records experiment 2's result and a Phase B secondary question / v1.25 adds the D2 improvement round after the D1 feedback, before any of its results / v1.26 adds two challengers before any challenger result / v1.27 sets the challengers' seeds and run order from the measured run time, before any challenger result / v1.28 defers the unfinished per-patient-length challenger and fixes the D2.1 decision and lockbox protocol before the last challenger's result / v1.29 records the `slow` result and runs the combination step / v1.30 records the D2.1 choice and its lockbox AUROC result / v1.31 records D2.1's lockbox alarm result and the model-explanation figures / v1.32 adds the annotation and artifact audit before running it / v1.33 records its result and the development alarm and warning-window results (see Section 13) |
 
 This document fixes how models are trained, tuned and scored for Deliverables 1 and 2. It adds detail to the verification plan (tag `vtp-1.0`) and doesn't change any of its pass/fail criteria. It is committed before any model is trained so the Git history shows these choices came first. Anything changed after results are seen goes in the version history (Section 11).
 
@@ -565,6 +565,7 @@ SeizeIT2 v1.1.0 (OpenNeuro ds005873, CC0 licence) was downloaded on 2026-09-28 i
 | 1.30 | 2026-10-31 | D2.1 = `per_channel_slow` (pooled development AUROC 0.720 against 0.690, higher in 27 of 36); its equivalence check passed (14 of 14); frozen as `freeze-d2.1`. Lockbox AUROC: 0.624 against the frozen design's 0.621 on the same 62 patients (+0.003, 95% CI −0.013 to +0.017): not confirmed, so the frozen design remains the final design (Section 14.14) |
 | 1.31 | 2026-10-31 | D2.1's lockbox alarm part (Section 14.12, item 3; same 20 patients): 33/78 seizures warned (42%) at 6.26 false alarms per 24 h, against the frozen design's 30/78 (38%) at 5.83; similar, and as for its AUROC, no change to the final design. Development-only figures of the EEG and of what the model relies on (Section 14.15), characterization only |
 | 1.32 | 2026-11-01 | Before it is run: an annotation and artifact audit of the development patients (Section 14.16), with its definitions and reading rules fixed; characterization only |
+| 1.33 | 2026-11-01 | Results of the audit (Section 14.16) and of the development alarm, PPV and warning-window analyses (Section 14.4), frozen design, seed 0 (Section 14.17). By the rules fixed in v1.32: no evidence that EEG just before the onset drives the result, no label confound, and an artifact gate worth testing on SeizeIT2 (false-alarm lift 1.5) but not on CHB-MIT and Siena (1.2). Nothing is adopted |
 
 ## 14. D2 improvement round (v1.25, 2026-10-26), written before any of its results
 
@@ -790,3 +791,61 @@ Two scripts look inside the per-channel + infra-slow design (`per_channel_slow`,
 
 **What it can't do.** The review is an engineering look by someone who isn't a clinical EEG reader. It can flag obvious problems but can't overrule expert annotations. SeizeIT2's annotations were made from full video-EEG, so a seizure that is invisible on the behind-the-ear channels (Section 14.15, sub-005) is a limit of the sensor, not an annotation error. Nothing from the audit relabels data or changes a reported result. A confirmed problem is reported, and any correction would be a new, pre-registered experiment.
 
+### 14.17 Results of the audit and of the development alarm analyses (v1.33, 2026-11-01)
+
+**Runs.** `run_d2_plus.py --arm frozen --alarms --seeds 0` on both development sets saved alarm-calibration scores; its SeizeIT2 AUROCs matched the earlier frozen results. Then `d2_plus_alarms.py --arm frozen` (Section 14.4) and `audit_annotations_artifacts.py` (Section 14.16) were run. The outputs are `results/d2_plus/<dataset>/alarms_frozen.md` and `results/d2_plus/audit/`.
+
+**Development alarms (frozen design, seed 0, 30 min warning window).**
+
+| | Target | Seizures warned | False alarms per 24 h | Chance | Alarm PPV | Time NPV |
+|---|---|---|---|---|---|---|
+| CHB-MIT and Siena (22 patients) | ≤ 5 | 14/93 (15%) | 3.18 | 6.4% | 0.18 | 0.92 |
+| | ≤ 1 | 8/93 (9%) | 1.21 | 2.5% | 0.25 | 0.92 |
+| SeizeIT2 development (14 patients) | ≤ 5 | 61/134 (46%) | 4.58 | 9.1% | 0.28 | 0.95 |
+| | ≤ 1 | 27/134 (20%) | 1.71 | 3.5% | 0.31 | 0.94 |
+
+These match the committed frozen-design results: 16% at 3.43 per 24 h on CHB-MIT and Siena (over seeds), and the SeizeIT2 dry run exactly. The 16 smoothing and persistence settings gave 14–18% warned on CHB-MIT and Siena, and 44–47% on SeizeIT2, at similar false-alarm rates. So the frozen settings aren't what limits the alarms, and none is changed (choosing the best of 16 here would repeat the selection problem of Section 14.14).
+
+**Warning window (the instructor's comment on timing; ≤ 5 setting, same thresholds, chance recomputed for each window).**
+
+| Warning window | CHB-MIT and Siena: warned (chance) | Times chance | SeizeIT2: warned (chance) | Times chance |
+|---|---|---|---|---|
+| 10 min | 2% (2.2%) | 1.0 | 15% (3.1%) | 4.8 |
+| 20 min | 5% (4.3%) | 1.3 | 20% (6.1%) | 3.3 |
+| 30 min | 15% (6.4%) | 2.4 | 46% (9.1%) | 5.0 |
+| 45 min | 18% (9.4%) | 1.9 | 51% (13.3%) | 3.9 |
+| 60 min | 20% (12.4%) | 1.7 | 60% (17.3%) | 3.5 |
+
+* **Shorter windows: chance or close to it.** At 10–20 min, the design is at chance on CHB-MIT and Siena, and above chance but warns only 15–20% of seizures on SeizeIT2.
+* **Many alarms come 20–30 min ahead.** On SeizeIT2 there were 0.78 alarms per seizure in the hour before onset that came too early for a 20 min window. Two things contribute. The model was trained on a 30 min preictal period. And with a 30 min refractory period, an alarm 25 min before onset can't be followed by another at 8 min before.
+* **So it doesn't give precise timing.** It signals raised risk over the next 30–60 min.
+
+**Audit (Section 14.16), by the rules fixed in v1.32.**
+
+* **Onsets.** The detector caught 54 of 111 eligible seizures within 2 min on CHB-MIT and Siena, typically 14 s after the annotated onset. On SeizeIT2 it caught 11 of 151, typically 48 s after.
+  * One onset was flagged (chb10, run beginning 78 s before). Its review figure shows the amplitude rising only at the annotated onset, while the detector sits near its threshold (0.83) through most of the preceding 5 min. That points to the detector misjudging chb10's background, not to a late onset.
+  * The flagged windows were 0.1% of preictal test windows, and AUROC without them was unchanged (0.710 against 0.710; SeizeIT2 0.669 against 0.669). **No evidence that EEG just before the onset drives the result.**
+  * The check covers only the seizures the detector found, which on the behind-the-ear channels is 7%.
+* **Possible unannotated seizures.** 14 sustained detections in 584 h of normal EEG on CHB-MIT and Siena (13 mostly artifact-flagged), and 18 in 1,720 h on SeizeIT2 (11 mostly artifact-flagged). The 8 others lasted 30–45 s, the shortest a candidate can be.
+  * In the review figures, none was clearly a missed seizure. Most were movement, muscle or electrode artifacts, or recording plateaus where every channel sits at a constant raised level.
+  * Three are left for a closer look (chb04 at 137.1 h, chb18 at 48.2 h, sub-083 at 7.2 h). The last shows sharp transients at about 1 per second, which could be ECG artifact.
+  * These are engineering readings, not clinical ones.
+* **Artifacts.** Windows were flagged on CHB-MIT and Siena at 8.8% of normal, 6.0% of preictal and 21.9% of ictal windows, and on SeizeIT2 at 12.4%, 17.4% and 49.2%. On SeizeIT2, 8.4% of normal windows had a channel above 150 µV RMS.
+  * **Label confound:** preictal against normal was 0.68 times (CHB-MIT and Siena) and 1.40 times (SeizeIT2; higher in 10 of 24 patients, p = 0.77). **No evidence of a confound** by the rule, though SeizeIT2 is close in the pooled rate.
+  * Removing test windows with a recent artifact left AUROC unchanged (0.710 → 0.715, p = 0.23; 0.669 → 0.668).
+* **False alarms and artifacts.**
+
+  | | False alarms with a recent artifact | True alarms with one | Normal EEG with one | Lift |
+  |---|---|---|---|---|
+  | CHB-MIT and Siena | 19% of 63 | 21% of 14 | 15% | 1.2 |
+  | SeizeIT2 | 42% of 158 | 31% of 61 | 28% | 1.5 |
+
+  **By the rule:** an artifact gate is worth pre-registering for the wearable (SeizeIT2), and isn't supported for hospital EEG. The lift just meets the bar, and true alarms also follow artifacts more often than normal EEG does, so a gate that blocks alarms would also cost warnings. This agrees with the v3 breakdown (F3-02), where 15–25% of false alarms fell in the wearer's most active 10% of time by accelerometer.
+* **Channels.** Several SeizeIT2 development recordings have only two working behind-the-ear channels (one flat throughout in the reviewed figures: sub-029, 073, 083 and 118 without BTEright, and sub-074 without CROSStop).
+
+**What follows.**
+
+* **For v3 (development data only, so Section 14.10's isolation allows it):** the artifact gate becomes a candidate Phase A experiment. Its method and decision rule will be written as a new version before it is run. Two forms are to be compared:
+  * leaving artifact-flagged windows out of the 3 min risk average, so noise can't push the average over the threshold while real changes still count;
+  * suppressing alarms that follow a recent artifact.
+* **For the D2 design:** nothing is adopted. The frozen design and its lockbox result stand.
