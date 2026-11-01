@@ -170,6 +170,7 @@ preictal_classifier_v2/
 │   ├── run_d2_plus.py ...    # D2 improvement round (see Section 14 of the evaluation methods)
 │   ├── run_seizeit2_d21.py   # D2.1 lockbox runner (refuses without tag freeze-d2.1)
 │   ├── explain_seizeit2.py   # What the model relies on (SeizeIT2 development patients only)
+│   ├── seizeit2_full_view.py # One seizure on one page, in µV: EEG, bands, spectrograms, risk, drivers
 │   └── audit_annotations_artifacts.py  # Annotation and artifact audit (development patients only)
 ├── src/preictal/             # Installable Python package
 │   ├── data/                 # loaders.py, harmonize.py, labels.py

@@ -1,0 +1,11 @@
+snapshot,channel,rms_uV_0.5_40Hz,delta_uV,theta_uV,alpha_uV,beta_uV,gamma_uV
+60 min before,BTEleft,53.34,48.66,10.68,7.53,16.83,14.97
+60 min before,CROSStop,55.03,43.78,15.36,14.02,20.77,19.75
+20 min before,BTEleft,6.78,4.17,2.07,1.85,3.94,3.82
+20 min before,CROSStop,9.99,6.64,2.97,4.05,5.89,5.67
+5 min before,BTEleft,8.29,5.48,2.3,2.08,4.79,4.98
+5 min before,CROSStop,13.17,9.7,3.32,4.39,7.04,7.3
+ending 5 s before,BTEleft,6.46,4.16,2.11,2.35,3.65,3.34
+ending 5 s before,CROSStop,13.25,10.4,3.3,4.53,6.59,6.19
+"seizure, 0-20 s",BTEleft,45.42,6.46,3.22,10.07,38.0,26.68
+"seizure, 0-20 s",CROSStop,40.26,13.57,4.47,9.43,30.84,27.06
