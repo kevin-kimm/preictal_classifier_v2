@@ -316,7 +316,10 @@ def review(dataset, W, p, rms, art, risk, thr, seizures, cands, review_dir, rule
     from matplotlib.ticker import FuncFormatter, LogLocator
     review_dir.mkdir(parents=True, exist_ok=True)
     flagged = sorted([s for s in seizures if s["flag_late_onset"]], key=lambda s: -s["lead_s"])[:N_REVIEW]
-    top_c = sorted(cands, key=lambda c: -c["duration_s"])[:N_REVIEW]
+    # every candidate that is mostly NOT artifact (the ones worth a look), then the longest of the rest
+    clean = sorted([c for c in cands if c["share_with_artifact"] < 0.5], key=lambda c: -c["duration_s"])
+    rest = sorted([c for c in cands if c["share_with_artifact"] >= 0.5], key=lambda c: -c["duration_s"])
+    top_c = clean + rest[:max(0, N_REVIEW - len(clean))]
     on_before = [s for s in seizures if s.get("active_throughout_5min")][:N_REVIEW // 2]
     events = [("late_onset", s["subject"], s["timeline"], s["onset_s"], s) for s in flagged] + \
              [("on_before", s["subject"], s["timeline"], s["onset_s"], s) for s in on_before] + \
