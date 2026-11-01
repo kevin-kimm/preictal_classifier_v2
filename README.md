@@ -169,13 +169,14 @@ preictal_classifier_v2/
 │   ├── run_lopo.py
 │   ├── run_d2_plus.py ...    # D2 improvement round (see Section 14 of the evaluation methods)
 │   ├── run_seizeit2_d21.py   # D2.1 lockbox runner (refuses without tag freeze-d2.1)
-│   └── explain_seizeit2.py   # What the model relies on (SeizeIT2 development patients only)
+│   ├── explain_seizeit2.py   # What the model relies on (SeizeIT2 development patients only)
+│   └── audit_annotations_artifacts.py  # Annotation and artifact audit (development patients only)
 ├── src/preictal/             # Installable Python package
 │   ├── data/                 # loaders.py, harmonize.py, labels.py
 │   ├── features/             # build_features.py, slow.py
 │   ├── models/               # model.py, train.py
 │   ├── alarm/                # alarm.py
-│   ├── evaluation/           # lopo.py, metrics.py, d2_plus.py
+│   ├── evaluation/           # lopo.py, metrics.py, d2_plus.py, audit.py
 │   ├── live/                 # cyton.py
 │   └── ui/                   # app.py
 ├── tests/                    # Automated verification tests (pytest)
@@ -223,7 +224,7 @@ Window level performance is measured by AUROC (preictal vs interictal) and a thr
 
 ## Tests
 
-196 automated tests run with `python -m pytest -q` from the repository root (about 5 seconds). They cover:
+200 automated tests run with `python -m pytest -q` from the repository root (about 5 seconds). They cover:
 
 * EDF reading and channel harmonization;
 * labeling rules and timelines;
@@ -234,7 +235,8 @@ Window level performance is measured by AUROC (preictal vs interictal) and a thr
 * the patient-specific and forward-in-time splits, including that nothing from the future is trained on;
 * the neural network (with a numerical gradient check);
 * the SeizeIT2 adapter;
-* the D2 improvement round: alternative labels (preictal length, windows that straddle two states), PPV/NPV and confusion counts, and the causal infra-slow features.
+* the D2 improvement round: alternative labels (preictal length, windows that straddle two states), PPV/NPV and confusion counts, and the causal infra-slow features;
+* the annotation and artifact audit: runs, artifact flags, the backward-only "recent artifact" rule and the onset check.
 
 Long verification runs have their own scripts and write their evidence to `results/`. The README itself is checked by `scripts/check_readme.py` (VT-20).
 
@@ -324,6 +326,7 @@ A planned sensitivity analysis with a 1-hour gap for normal EEG lowered the froz
 | 2 | Continuous-personalization simulation (added) | – | Done (F2-18) |
 | 2 | Final analysis of results | 10% | Done ([final_analysis.md](docs/final_analysis.md)) |
 | 2 | README | 15% | Checked by `scripts/check_readme.py` (VT-20) |
+| 2 | Annotation and artifact audit (added): late onsets, unannotated seizures, artifacts and false alarms | – | Planned before any result ([evaluation methods](docs/evaluation_methods.md) v1.32, Section 14.16) |
 | 2 | Improvement round after the D1 feedback (added): preictal length, infra-slow and per-channel features, PPV/NPV, model explanation | – | Done: D2.1 not confirmed on new patients ([evaluation methods](docs/evaluation_methods.md) v1.25–v1.31, Section 14; [responses](docs/d1_feedback_responses.md)); unsupervised test and interictal-gap runs still to run |
 | 3 (20%) | Local interface showing dataset replay and alarms | 10% | Not started |
 | 3 | Real-time Cyton acquisition, live baseline, seizure-free recording | – | Not started |
